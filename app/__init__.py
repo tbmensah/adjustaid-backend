@@ -1,0 +1,1 @@
+"""AdjustAid FastAPI application package."""
