@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from functools import lru_cache
 from typing import Any
 
@@ -11,8 +12,12 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jwt import PyJWKClient
 from jwt.exceptions import DecodeError, InvalidTokenError, PyJWKClientConnectionError, PyJWKClientError
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.db.session import get_db
+from app.models.users import User
 
 logger = logging.getLogger(__name__)
 
@@ -132,3 +137,29 @@ def jwt_payload(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail=f"Unsupported token algorithm: {alg}",
     )
+
+
+def current_user(
+    payload: dict[str, Any] = Depends(jwt_payload),
+    db: Session = Depends(get_db),
+) -> User:
+    sub = payload.get("sub")
+    if not sub:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token missing sub claim",
+        )
+    try:
+        auth_id = uuid.UUID(str(sub))
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid sub in token",
+        ) from None
+    user = db.scalar(select(User).where(User.auth_id == auth_id))
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found in app — register or sync profile first",
+        )
+    return user

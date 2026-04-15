@@ -24,7 +24,15 @@ class Settings(BaseSettings):
     )
     supabase_service_role_key: str | None = Field(
         default=None,
-        description="Optional. Service role key for Admin API or server-side Supabase client (keep server-only).",
+        description="Service role key — server-only; Storage signed URLs and Admin API.",
+    )
+    supabase_storage_bucket_ff_input: str | None = Field(
+        default=None,
+        description="Fast Fill input bucket — presigned uploads (user PDFs / source files).",
+    )
+    supabase_storage_bucket_ff_output: str | None = Field(
+        default=None,
+        description="Fast Fill output bucket — generated files / exports (signed downloads when implemented).",
     )
 
     cors_origins: str = Field(
