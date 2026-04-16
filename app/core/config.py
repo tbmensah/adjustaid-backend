@@ -32,7 +32,17 @@ class Settings(BaseSettings):
     )
     supabase_storage_bucket_ff_output: str | None = Field(
         default=None,
-        description="Fast Fill output bucket — generated files / exports (signed downloads when implemented).",
+        description="Fast Fill output bucket — generated files / exports.",
+    )
+    supabase_storage_bucket_ee_output: str | None = Field(
+        default=None,
+        description="Express estimate output bucket; if unset, FF output bucket is used for EE download URLs.",
+    )
+    storage_signed_download_ttl_seconds: int = Field(
+        default=3600,
+        ge=60,
+        le=604800,
+        description="Lifetime (seconds) for on-the-fly signed download URLs in job list responses.",
     )
 
     cors_origins: str = Field(

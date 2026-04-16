@@ -29,3 +29,20 @@ def create_ff_signed_upload_url(input_bucket: str, object_path: str) -> dict[str
         object_path,
         options=CreateSignedUploadUrlOptions(upsert="true"),
     )
+
+
+def create_signed_download_url(
+    bucket: str,
+    object_path: str,
+    *,
+    expires_in: int = 3600,
+) -> str:
+    """Short-lived read URL for an object in Storage."""
+    sb = get_supabase_service_client()
+    path = object_path.strip().lstrip("/")
+    r = sb.storage.from_(bucket).create_signed_url(path, expires_in)
+    url = r.get("signedURL") or r.get("signedUrl") or ""
+    if not url:
+        msg = "Storage API returned no signed download URL"
+        raise RuntimeError(msg)
+    return url
