@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from sqlalchemy import Select, String, and_, cast, func, select
+from sqlalchemy import Select, and_, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import get_settings
@@ -119,7 +119,7 @@ def _like_pattern(q: str) -> str:
     return f"%{s}%"
 
 
-def search_user_jobs_by_id(
+def search_user_jobs_by_original_filename(
     db: Session,
     *,
     user: User,
@@ -129,10 +129,11 @@ def search_user_jobs_by_id(
     page: int = 1,
     page_size: int = 20,
 ) -> tuple[list[JobHistoryItem], int]:
-    """Match `jobs.id` as text with ILIKE substring (scoped to user)."""
+    """Match `jobs.original_filename` with ILIKE substring (scoped to user)."""
     conditions = [
         Job.user_id == user.id,
-        cast(Job.id, String).ilike(_like_pattern(q), escape="\\"),
+        Job.original_filename.is_not(None),
+        Job.original_filename.ilike(_like_pattern(q), escape="\\"),
     ]
     if job_type is not None:
         conditions.append(Job.job_type == job_type)

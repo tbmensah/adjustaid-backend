@@ -58,7 +58,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         exc: RequestValidationError,
     ) -> JSONResponse:
         return JSONResponse(
-            status_code=422,
+            status_code=400,
             content=ErrorEnvelope(
                 message="Request validation failed",
                 error=ErrorBody(code="validation_error", details=exc.errors()),

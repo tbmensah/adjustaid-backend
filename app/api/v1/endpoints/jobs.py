@@ -11,17 +11,17 @@ from app.models.enums import JobStatus, JobType
 from app.models.users import User
 from app.schemas.envelope import SuccessEnvelope
 from app.schemas.job_history import JobHistoryPage
-from app.services.job_history import list_user_jobs, search_user_jobs_by_id
+from app.services.job_history import list_user_jobs, search_user_jobs_by_original_filename
 
 router = APIRouter()
 
 
 @router.get(
     "/jobs/search",
-    summary="Search jobs by job id substring",
+    summary="Search jobs by original file / project name",
     description=(
-        "Case-insensitive substring match on UUID string (hyphens included). "
-        "Example: `q=3fa85f64` or full id. Scoped to the signed-in user."
+        "Case-insensitive substring match on `jobs.original_filename` (FF: uploaded PDF name; "
+        "EE: project name from wizard). Jobs with no stored name are omitted. Scoped to the signed-in user."
     ),
 )
 def search_jobs(
@@ -30,8 +30,8 @@ def search_jobs(
     q: str = Query(
         ...,
         min_length=1,
-        max_length=64,
-        description="Fragment of job UUID to match.",
+        max_length=1024,
+        description="Substring to match against `original_filename`.",
     ),
     job_type: JobType | None = Query(
         default=None,
@@ -44,7 +44,7 @@ def search_jobs(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
 ) -> SuccessEnvelope[JobHistoryPage]:
-    items, total = search_user_jobs_by_id(
+    items, total = search_user_jobs_by_original_filename(
         db,
         user=user,
         q=q,

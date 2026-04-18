@@ -55,6 +55,8 @@ def submit_ff_job_details(
     if not pdf_key:
         pdf_key = default_pdf_key
 
+    job.original_filename = body.original_filename
+
     details = JobDetailsFF(
         job_id=job_id,
         ff_pdf_type=body.ff_pdf_type,

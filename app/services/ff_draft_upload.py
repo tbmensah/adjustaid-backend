@@ -51,7 +51,7 @@ def create_ff_draft_upload_intent(
         user_id=user.id,
         job_type=JobType.FF,
         status=JobStatus.DRAFT,
-        original_filename=str(job_id),
+        original_filename=None,
     )
     db.add(job)
     try:

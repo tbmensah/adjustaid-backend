@@ -27,7 +27,8 @@ router = APIRouter()
     summary="Submit Fast Fill job metadata",
     description=(
         "Requires draft FF job from `GET .../draft-upload`. "
-        "Sets `ff_pdf_type` and optional storage keys; creates `job_details_ff` and moves job to `confirmed`."
+        "Sets `ff_pdf_type`, required `original_filename` (stored on `jobs`), optional storage keys; "
+        "creates `job_details_ff` and moves job to `confirmed`."
     ),
 )
 def submit_ff_job_details_endpoint(

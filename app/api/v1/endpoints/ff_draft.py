@@ -24,7 +24,8 @@ router = APIRouter()
     description=(
         "Returns `job_id` and `upload_url` so the client can upload the file and "
         "send the rest of the payload in parallel. Storage object is `{user_id}/{job_id}`. "
-        "`job_details_ff` is created when the full payload is submitted."
+        "Set `original_filename` on `POST /jobs/ff/{job_id}/details` with `ff_pdf_type` and keys. "
+        "`job_details_ff` is created when that payload is submitted."
     ),
 )
 def ff_draft_upload_intent(
