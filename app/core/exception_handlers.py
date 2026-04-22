@@ -9,6 +9,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import JSONResponse
 
+from app.core.config import get_settings
 from app.schemas.envelope import ErrorBody, ErrorEnvelope
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,7 @@ def _status_default_message(status_code: int) -> str:
         404: "Not found",
         405: "Method not allowed",
         409: "Conflict",
+        402: "Payment required",
         422: "Unprocessable entity",
         429: "Too many requests",
         500: "Internal server error",
@@ -44,6 +46,7 @@ def _semantic_error_code(status_code: int) -> str | None:
         404: "not_found",
         405: "method_not_allowed",
         409: "conflict",
+        402: "payment_required",
         422: "validation_error",
         429: "too_many_requests",
         503: "service_unavailable",
@@ -68,6 +71,15 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(_request: Request, exc: StarletteHTTPException) -> JSONResponse:
         semantic = _semantic_error_code(exc.status_code)
+        if not get_settings().is_development and exc.status_code >= 500:
+            code = semantic or "internal_error"
+            return JSONResponse(
+                status_code=exc.status_code,
+                content=ErrorEnvelope(
+                    message=_status_default_message(exc.status_code),
+                    error=ErrorBody(code=code, details=None),
+                ).model_dump(),
+            )
         detail = exc.detail
         if isinstance(detail, str):
             err = ErrorBody(code=semantic, details=None)

@@ -17,7 +17,28 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.db.session import get_db
+from app.models.enums import UserType
 from app.models.users import User
+
+
+def require_stub_token_credit_enabled() -> None:
+    """
+    Stub credit only in development-like `APP_ENV`; never leak hints in production.
+
+    Non-dev: 500 + generic message (handler may still sanitize body for 5xx).
+    Dev without flag: 403 + setup hint.
+    """
+    s = get_settings()
+    if not s.is_development:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
+        )
+    if not s.stub_token_credit_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Stub token credit is disabled (set STUB_TOKEN_CREDIT_ENABLED=true for local/dev).",
+        )
 
 logger = logging.getLogger(__name__)
 
@@ -161,5 +182,15 @@ def current_user(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found in app — register or sync profile first",
+        )
+    return user
+
+
+def require_back_office(user: User = Depends(current_user)) -> User:
+    """403 unless `public.users.user_type` is `back_office` (ops / processing UI)."""
+    if user.user_type != UserType.BACK_OFFICE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Back-office role required",
         )
     return user

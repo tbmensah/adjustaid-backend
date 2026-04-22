@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.integrations.supabase_admin import create_ff_signed_upload_url
-from app.models.enums import JobStatus, JobType
+from app.models.enums import JobStatus, JobType, UserType
 from app.models.jobs import Job, JobDetailsFF
 from app.models.users import User
 
@@ -27,10 +27,10 @@ class RefreshFfUploadConflict(Exception):
         self.detail = detail
 
 
-def _object_path_for_job(user: User, job_id: uuid.UUID, details: JobDetailsFF | None) -> str:
+def _object_path_for_job(job: Job, job_id: uuid.UUID, details: JobDetailsFF | None) -> str:
     if details is not None and details.pdf_file_key:
         return details.pdf_file_key.strip()
-    return f"{user.id}/{job_id}"
+    return f"{job.user_id}/{job_id}"
 
 
 def refresh_ff_upload_url(
@@ -40,13 +40,13 @@ def refresh_ff_upload_url(
     job_id: uuid.UUID,
     input_bucket: str,
 ) -> tuple[uuid.UUID, str, str]:
-    job = db.scalar(
-        select(Job).where(
-            Job.id == job_id,
-            Job.user_id == user.id,
-            Job.job_type == JobType.FF,
-        )
+    stmt = select(Job).where(
+        Job.id == job_id,
+        Job.job_type == JobType.FF,
     )
+    if user.user_type != UserType.BACK_OFFICE:
+        stmt = stmt.where(Job.user_id == user.id)
+    job = db.scalar(stmt)
     if job is None:
         raise RefreshFfUploadNotFound()
 
@@ -54,7 +54,7 @@ def refresh_ff_upload_url(
         raise RefreshFfUploadConflict("Job no longer accepts upload refresh (wrong status)")
 
     details = db.get(JobDetailsFF, job_id)
-    object_path = _object_path_for_job(user, job_id, details)
+    object_path = _object_path_for_job(job, job_id, details)
 
     try:
         signed = create_ff_signed_upload_url(input_bucket, object_path)

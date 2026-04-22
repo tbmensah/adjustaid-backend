@@ -41,8 +41,13 @@ def get_engine() -> Engine:
 
 
 def get_db() -> Generator[Session, None, None]:
+    """One session per request: commit on success, rollback on any exception before close."""
     db = SessionLocal(bind=get_engine())
     try:
         yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()

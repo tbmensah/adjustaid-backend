@@ -6,6 +6,7 @@ from app.models.enums import (
     StripeStatus,
     TokenType,
     TransactionReason,
+    UserType,
 )
 from app.models.jobs import Job, JobDetailsEE, JobDetailsFF, JobStatusHistory
 from app.models.users import User
@@ -25,4 +26,5 @@ __all__ = [
     "TokenWallet",
     "TransactionReason",
     "User",
+    "UserType",
 ]

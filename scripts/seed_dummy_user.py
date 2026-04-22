@@ -27,7 +27,7 @@ import httpx
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.db.session import get_engine
-from app.models import User
+from app.models import User, UserType
 
 
 def _require(name: str) -> str:
@@ -98,6 +98,7 @@ def main() -> None:
             email=email,
             full_name="Dummy User",
             company="AdjustAid Test",
+            user_type=UserType.CUSTOMER,
         )
         db.add(row)
         db.commit()

@@ -12,6 +12,9 @@ from app.models.enums import FfPdfType, JobStatus, JobType
 
 class JobHistoryItem(BaseModel):
     id: uuid.UUID
+    owner_id: uuid.UUID = Field(
+        description="App user id of the job owner. For customers this is always your own id.",
+    )
     job_type: JobType
     status: JobStatus
     original_filename: str | None

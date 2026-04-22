@@ -22,13 +22,65 @@ def get_supabase_service_client() -> Client:
     return create_client(url, key)
 
 
-def create_ff_signed_upload_url(input_bucket: str, object_path: str) -> dict[str, Any]:
+def create_signed_upload_url(bucket: str, object_path: str) -> dict[str, Any]:
     """Presigned upload URL with upsert so re-upload same path overwrites object."""
     sb = get_supabase_service_client()
-    return sb.storage.from_(input_bucket).create_signed_upload_url(
-        object_path,
+    path = object_path.strip().lstrip("/")
+    return sb.storage.from_(bucket).create_signed_upload_url(
+        path,
         options=CreateSignedUploadUrlOptions(upsert="true"),
     )
+
+
+def create_ff_signed_upload_url(input_bucket: str, object_path: str) -> dict[str, Any]:
+    """Presigned upload URL with upsert so re-upload same path overwrites object."""
+    return create_signed_upload_url(input_bucket, object_path)
+
+
+def upload_bytes(
+    bucket: str,
+    object_path: str,
+    data: bytes,
+    content_type: str,
+    *,
+    upsert: bool = True,
+) -> None:
+    """Upload raw bytes to Storage (service role)."""
+    sb = get_supabase_service_client()
+    path = object_path.strip().lstrip("/")
+    opts: dict[str, str] = {"content-type": content_type}
+    if upsert:
+        opts["upsert"] = "true"
+    # storage3 2.28 treats BytesIO as a path (calls open()); raw bytes is supported.
+    sb.storage.from_(bucket).upload(path, data, file_options=opts)
+
+
+def _split_storage_object_path(object_path: str) -> tuple[str, str]:
+    """Return (folder_prefix, file_name) for Storage list(). Folder may be empty."""
+    path = object_path.strip().lstrip("/")
+    if "/" not in path:
+        return "", path
+    folder, name = path.rsplit("/", 1)
+    return folder, name
+
+
+def object_exists(bucket: str, object_path: str) -> bool:
+    """True if an object exists at path."""
+    sb = get_supabase_service_client()
+    path = object_path.strip().lstrip("/")
+    bucket_api = sb.storage.from_(bucket)
+    exists_fn = getattr(bucket_api, "exists", None)
+    if callable(exists_fn):
+        try:
+            return bool(exists_fn(path))
+        except Exception:
+            pass
+    folder, name = _split_storage_object_path(path)
+    try:
+        items = bucket_api.list(folder or "")
+    except Exception:
+        return False
+    return any(it.get("name") == name for it in items or [])
 
 
 def create_signed_download_url(

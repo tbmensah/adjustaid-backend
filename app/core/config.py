@@ -11,6 +11,11 @@ _ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=_ENV_FILE, env_file_encoding="utf-8", extra="ignore")
 
+    app_env: str = Field(
+        default="production",
+        description="Application environment: development/dev/local expose richer API errors; production does not.",
+    )
+
     database_url: str | None = Field(default=None, description="Postgres connection string (pooler is fine for the app).")
     direct_url: str | None = Field(default=None, description="Direct Postgres URL for migrations / DDL if needed.")
 
@@ -30,13 +35,27 @@ class Settings(BaseSettings):
         default=None,
         description="Fast Fill input bucket — presigned uploads (user PDFs / source files).",
     )
+    supabase_storage_bucket_ff_samples: str | None = Field(
+        default=None,
+        description="Fast Fill sample/reference uploads only — not sent through normal FF job pipeline; presign via sample-upload endpoint.",
+    )
     supabase_storage_bucket_ff_output: str | None = Field(
         default=None,
         description="Fast Fill output bucket — generated files / exports.",
     )
+    supabase_storage_bucket_ee_readable: str | None = Field(
+        default=None,
+        description=(
+            "Express estimate readable renders only — server-written `payload.md` per job. "
+            "If unset, `supabase_storage_bucket_ee_output` then FF output bucket is used."
+        ),
+    )
     supabase_storage_bucket_ee_output: str | None = Field(
         default=None,
-        description="Express estimate output bucket; if unset, FF output bucket is used for EE download URLs.",
+        description=(
+            "Express estimate final artifacts — presigned operator uploads and `output_file_key` downloads. "
+            "If unset, FF output bucket is used for those URLs."
+        ),
     )
     storage_signed_download_ttl_seconds: int = Field(
         default=3600,
@@ -49,6 +68,26 @@ class Settings(BaseSettings):
         default="",
         description="Comma-separated browser origins allowed for CORS (e.g. http://localhost:5173,https://app.example.com). Empty = no CORS middleware.",
     )
+
+    stub_token_credit_enabled: bool = Field(
+        default=False,
+        description="When true and app_env is development-like, POST /api/v1/tokens/stub/credit adds tokens without Stripe.",
+    )
+
+    ee_job_submit_token_cost: int = Field(
+        default=1,
+        ge=0,
+        description="Express Estimate (EE) tokens debited on POST /jobs/ee. Set 0 to skip debit (not recommended in production).",
+    )
+    ff_job_submit_token_cost: int = Field(
+        default=1,
+        ge=0,
+        description="Fast Fill (FF) tokens debited when submitting draft job details (draft → confirmed). Set 0 to skip.",
+    )
+
+    @property
+    def is_development(self) -> bool:
+        return (self.app_env or "").strip().lower() in ("development", "dev", "local")
 
 
 @lru_cache

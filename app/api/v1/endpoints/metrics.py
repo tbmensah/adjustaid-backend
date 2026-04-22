@@ -17,8 +17,8 @@ router = APIRouter()
     "/metrics",
     summary="Dashboard metrics (tokens + job buckets)",
     description=(
-        "Token balances (`ff_balance`, `ee_balance`) plus job counts: `processing` = status processing, "
-        "`needs_review` = status failed."
+        "Token balances (`ff_balance`, `ee_balance`) plus job counts for the signed-in user only: "
+        "`processing` = status processing, `needs_review` = status failed."
     ),
 )
 def get_metrics(
@@ -33,8 +33,10 @@ def get_metrics(
     "/metrics/job-status-summary",
     summary="Job status counts for dashboard",
     description=(
-        "Per-user counts grouped for UI: `draft`; `submitted` = confirmed + queued; `processing`; "
-        "`completed`; `failed`. `needs_review` currently matches `failed` (no separate enum yet)."
+        "Per-user counts grouped for UI (excludes `draft` jobs — same as GET /jobs). "
+        "`draft` field always 0; use FF draft flow for in-progress uploads. "
+        "`submitted` = confirmed + queued; `processing`; `completed`; `failed`. "
+        "`needs_review` matches `failed` until a separate status exists."
     ),
 )
 def get_job_status_summary_endpoint(

@@ -9,10 +9,11 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.models.enums import JobStatus, JobType
+from app.models.enums import JobStatus, JobType, TokenType, UserType
 from app.models.jobs import Job, JobDetailsFF
 from app.models.users import User
 from app.schemas.ff_job import FfJobDetailsRequest
+from app.services.job_token_debit import InsufficientTokensError, debit_job_tokens, ff_submit_token_cost
 
 logger = logging.getLogger(__name__)
 
@@ -33,13 +34,13 @@ def submit_ff_job_details(
     job_id: uuid.UUID,
     body: FfJobDetailsRequest,
 ) -> Job:
-    job = db.scalar(
-        select(Job).where(
-            Job.id == job_id,
-            Job.user_id == user.id,
-            Job.job_type == JobType.FF,
-        )
+    stmt = select(Job).where(
+        Job.id == job_id,
+        Job.job_type == JobType.FF,
     )
+    if user.user_type != UserType.BACK_OFFICE:
+        stmt = stmt.where(Job.user_id == user.id)
+    job = db.scalar(stmt)
     if job is None:
         raise SubmitFfJobDetailsNotFound()
 
@@ -50,7 +51,8 @@ def submit_ff_job_details(
     if existing is not None:
         raise SubmitFfJobDetailsConflict("Job details already submitted")
 
-    default_pdf_key = f"{user.id}/{job_id}"
+    owner_id = job.user_id
+    default_pdf_key = f"{owner_id}/{job_id}"
     pdf_key = body.pdf_file_key.strip() if body.pdf_file_key else default_pdf_key
     if not pdf_key:
         pdf_key = default_pdf_key
@@ -65,8 +67,20 @@ def submit_ff_job_details(
     )
     job.status = JobStatus.CONFIRMED
     db.add(details)
+    cost = ff_submit_token_cost()
     try:
+        db.flush()
+        debit_job_tokens(
+            db,
+            wallet_user_id=owner_id,
+            job_id=job_id,
+            token_type=TokenType.FF,
+            amount=cost,
+        )
         db.commit()
+    except InsufficientTokensError:
+        db.rollback()
+        raise
     except IntegrityError:
         db.rollback()
         raise SubmitFfJobDetailsConflict("Job details already submitted") from None
