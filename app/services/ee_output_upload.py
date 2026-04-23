@@ -18,7 +18,7 @@ from app.integrations.supabase_admin import (
 )
 from app.models.enums import JobStatus, JobType
 from app.models.jobs import Job, JobStatusHistory
-from app.services.ee_readable_render import render_payload_markdown
+from app.services.ee_readable_render import render_payload_markdown, render_payload_xlsx_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +57,10 @@ def build_readable_input_key(user_id: uuid.UUID, job_id: uuid.UUID) -> str:
     return f"ee/{user_id}/{job_id}/payload.md"
 
 
+def build_readable_input_excel_key(user_id: uuid.UUID, job_id: uuid.UUID) -> str:
+    return f"ee/{user_id}/{job_id}/payload.xlsx"
+
+
 def build_output_key(user_id: uuid.UUID, job_id: uuid.UUID, ext: str) -> str:
     ext_clean = ext.lstrip(".").lower()
     if ext_clean not in ALLOWED_OUTPUT_EXTENSIONS:
@@ -70,15 +74,24 @@ def _normalize_upload_path(object_path: str) -> str:
 
 
 def store_readable_input(job: Job) -> str:
-    """Render payload to markdown and upload to EE readable bucket. Returns object path."""
+    """Render payload to markdown + Excel and upload both to EE readable bucket. Returns markdown object path."""
     if job.job_type != JobType.EE or job.details_ee is None:
         msg = "Job is not an EE job with details"
         raise ValueError(msg)
     bucket = ee_readable_bucket()
-    key = build_readable_input_key(job.user_id, job.id)
+    key_md = build_readable_input_key(job.user_id, job.id)
+    key_xlsx = build_readable_input_excel_key(job.user_id, job.id)
     md = render_payload_markdown(job.details_ee.payload)
-    upload_bytes(bucket, key, md.encode("utf-8"), "text/markdown; charset=utf-8", upsert=True)
-    return key
+    upload_bytes(bucket, key_md, md.encode("utf-8"), "text/markdown; charset=utf-8", upsert=True)
+    xlsx = render_payload_xlsx_bytes(job.details_ee.payload)
+    upload_bytes(
+        bucket,
+        key_xlsx,
+        xlsx,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        upsert=True,
+    )
+    return key_md
 
 
 def issue_output_upload_url(*, job: Job, filename: str) -> dict[str, Any]:
@@ -157,3 +170,35 @@ def input_render_exists(job: Job) -> bool:
         return False
     key = build_readable_input_key(job.user_id, job.id)
     return object_exists(bucket, key)
+
+
+def input_render_excel_exists(job: Job) -> bool:
+    if job.job_type != JobType.EE:
+        return False
+    try:
+        bucket = ee_readable_bucket()
+    except RuntimeError:
+        return False
+    key = build_readable_input_excel_key(job.user_id, job.id)
+    return object_exists(bucket, key)
+
+
+def ensure_readable_input_excel(job: Job) -> bool:
+    """If `payload.md` exists but `payload.xlsx` is missing, generate and upload Excel (legacy backfill)."""
+    if job.job_type != JobType.EE or job.details_ee is None:
+        return False
+    if input_render_excel_exists(job):
+        return True
+    if not input_render_exists(job):
+        return False
+    bucket = ee_readable_bucket()
+    key = build_readable_input_excel_key(job.user_id, job.id)
+    xlsx = render_payload_xlsx_bytes(job.details_ee.payload)
+    upload_bytes(
+        bucket,
+        key,
+        xlsx,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        upsert=True,
+    )
+    return True

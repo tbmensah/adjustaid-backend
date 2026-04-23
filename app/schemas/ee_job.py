@@ -5,6 +5,8 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 from app.models.enums import JobStatus
@@ -27,12 +29,18 @@ class EeJobDetail(BaseModel):
     updated_at: datetime
     output_ready: bool = Field(description="True when operator uploaded final output (output_file_key set).")
     has_input_render: bool = Field(description="True when payload.md exists in Storage.")
+    has_input_excel: bool = Field(description="True when payload.xlsx exists in Storage.")
     error_message: str | None = None
 
 
 class EeJobDownloadData(BaseModel):
     url: str
     expires_in: int = Field(description="Signed URL lifetime in seconds.")
+    format: Literal["markdown", "excel", "output"] = Field(
+        default="markdown",
+        description="Readable input format, or `output` for operator-uploaded artifact URLs.",
+    )
+    filename: str = Field(description="Suggested basename for client download.")
 
 
 class EeOutputUploadUrlBody(BaseModel):

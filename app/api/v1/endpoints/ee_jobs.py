@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
-from typing import Annotated
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
@@ -29,11 +30,14 @@ from app.schemas.envelope import SuccessEnvelope
 from app.services.ee_job_create import create_ee_job_from_payload
 from app.services.job_token_debit import InsufficientTokensError
 from app.services.ee_output_upload import (
+    build_readable_input_excel_key,
     build_readable_input_key,
     confirm_output_upload,
     ee_output_bucket,
     ee_readable_bucket,
+    ensure_readable_input_excel,
     input_render_exists,
+    input_render_excel_exists,
     issue_output_upload_url,
     store_readable_input,
 )
@@ -42,6 +46,21 @@ logger = logging.getLogger(__name__)
 
 # EE routes: customers create jobs only; back_office processes any job. Readable `payload.md` upload/download is back-office only.
 router = APIRouter()
+
+_EXCEL_FORMAT_ALIASES = frozenset({"excel", "xlsx", "spreadsheet", "sheet", "sheets"})
+_MARKDOWN_FORMAT_ALIASES = frozenset({"markdown", "md", "text"})
+
+
+def _coerce_input_download_format(raw: str) -> Literal["markdown", "excel"]:
+    key = (raw or "markdown").strip().lower()
+    if key in _EXCEL_FORMAT_ALIASES:
+        return "excel"
+    if key in _MARKDOWN_FORMAT_ALIASES or key == "":
+        return "markdown"
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        detail=f"Unknown format={raw!r}. Use markdown, md, excel, xlsx, or spreadsheet.",
+    )
 
 
 def _get_ee_job(db: Session, actor: User, job_id: uuid.UUID) -> Job | None:
@@ -59,7 +78,7 @@ def _get_ee_job(db: Session, actor: User, job_id: uuid.UUID) -> Job | None:
     return db.scalars(stmt).first()
 
 
-def _ee_job_detail(job: Job, *, has_input_render: bool) -> EeJobDetail:
+def _ee_job_detail(job: Job, *, has_input_render: bool, has_input_excel: bool) -> EeJobDetail:
     de = job.details_ee
     if de is None:
         msg = "EE job missing details row"
@@ -72,6 +91,7 @@ def _ee_job_detail(job: Job, *, has_input_render: bool) -> EeJobDetail:
         updated_at=job.updated_at,
         output_ready=bool(de.output_file_key and str(de.output_file_key).strip()),
         has_input_render=has_input_render,
+        has_input_excel=has_input_excel,
         error_message=job.error_message,
     )
 
@@ -82,8 +102,8 @@ def _ee_job_detail(job: Job, *, has_input_render: bool) -> EeJobDetail:
     description=(
         "Express Estimate wizard JSON (camelCase keys). `projectDetails.projectName` and "
         "`projectDetails.claimNumber` required; other sections optional; unknown keys rejected. "
-        "Stored in `job_details_ee.payload`. Readable `payload.md` is **not** written here — "
-        "back office uploads it via `POST /api/v1/jobs/ee/{job_id}/input-render`. "
+        "Stored in `job_details_ee.payload`. Readable `payload.md` / `payload.xlsx` are **not** written here — "
+        "back office uploads them via `POST /api/v1/jobs/ee/{job_id}/input-render`. "
         "`input_render_ready` is always false on this response until ops has uploaded. "
         "**Customer accounts only** — back-office users cannot create jobs here. "
         "Requires sufficient EE token balance (`EE_JOB_SUBMIT_TOKEN_COST`, default 1); otherwise **402**."
@@ -155,9 +175,9 @@ def submit_express_estimate(
 
 @router.post(
     "/jobs/ee/{job_id}/input-render",
-    summary="[Back office] Upload readable payload.md to Storage",
+    summary="[Back office] Upload readable payload.md and payload.xlsx to Storage",
     description=(
-        "Renders wizard JSON to markdown and writes `payload.md` to the EE readable bucket. "
+        "Renders wizard JSON to markdown and Excel, writing `payload.md` and `payload.xlsx` to the EE readable bucket. "
         "**403** unless `user_type` is `back_office`. May target any customer's job by `job_id`."
     ),
 )
@@ -175,10 +195,11 @@ def ee_retry_input_render(
         logger.exception("EE input render retry failed job_id=%s", job_id)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Could not upload readable markdown to Storage",
+            detail="Could not upload readable exports to Storage",
         ) from None
     has_input = input_render_exists(job)
-    return SuccessEnvelope(message="OK", data=_ee_job_detail(job, has_input_render=has_input))
+    has_xlsx = input_render_excel_exists(job)
+    return SuccessEnvelope(message="OK", data=_ee_job_detail(job, has_input_render=has_input, has_input_excel=has_xlsx))
 
 
 @router.get(
@@ -194,21 +215,33 @@ def ee_job_detail(
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="EE job not found")
     has_input = input_render_exists(job)
-    return SuccessEnvelope(message="OK", data=_ee_job_detail(job, has_input_render=has_input))
+    has_xlsx = input_render_excel_exists(job)
+    return SuccessEnvelope(message="OK", data=_ee_job_detail(job, has_input_render=has_input, has_input_excel=has_xlsx))
 
 
 @router.get(
     "/jobs/ee/{job_id}/input-download",
-    summary="[Back office] Signed download URL for readable payload.md",
+    summary="[Back office] Signed download URL for readable payload (markdown or Excel)",
     description=(
-        "Short-lived read URL for `payload.md`. **403** unless `user_type` is `back_office`."
+        "Short-lived read URL for `payload.md` or `payload.xlsx`. "
+        "`format` default `markdown`; also accepts `md`, `excel`, `xlsx`, `spreadsheet`, `sheet`. "
+        "Legacy jobs with only markdown get Excel generated on first spreadsheet download. "
+        "**403** unless `user_type` is `back_office`."
     ),
 )
 def ee_input_download(
     job_id: uuid.UUID,
+    download_format: Annotated[
+        str,
+        Query(
+            alias="format",
+            description="markdown | md | excel | xlsx | spreadsheet | sheet",
+        ),
+    ] = "markdown",
     db: Session = Depends(get_db),
     user: User = Depends(require_back_office),
 ) -> SuccessEnvelope[EeJobDownloadData]:
+    response_format = _coerce_input_download_format(download_format)
     job = _get_ee_job(db, user, job_id)
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="EE job not found")
@@ -218,8 +251,28 @@ def ee_input_download(
             detail="Readable input not available — POST /api/v1/jobs/ee/{job_id}/input-render first",
         )
     bucket = ee_readable_bucket()
-    key = build_readable_input_key(job.user_id, job.id)
     ttl = get_settings().storage_signed_download_ttl_seconds
+    if response_format == "excel":
+        try:
+            ensure_readable_input_excel(job)
+        except Exception:
+            logger.exception("EE readable excel backfill failed job_id=%s", job_id)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Could not prepare Excel export",
+            ) from None
+        if not input_render_excel_exists(job):
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Excel export not available after upload attempt",
+            )
+        key = build_readable_input_excel_key(job.user_id, job.id)
+        filename = "payload.xlsx"
+        fmt: Literal["markdown", "excel", "output"] = "excel"
+    else:
+        key = build_readable_input_key(job.user_id, job.id)
+        filename = "payload.md"
+        fmt = "markdown"
     try:
         url = create_signed_download_url(bucket, key, expires_in=ttl)
     except Exception:
@@ -228,7 +281,10 @@ def ee_input_download(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Could not create signed download URL",
         ) from None
-    return SuccessEnvelope(message="OK", data=EeJobDownloadData(url=url, expires_in=ttl))
+    return SuccessEnvelope(
+        message="OK",
+        data=EeJobDownloadData(url=url, expires_in=ttl, format=fmt, filename=filename),
+    )
 
 
 @router.get(
@@ -260,7 +316,11 @@ def ee_output_download(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Could not create signed download URL",
         ) from None
-    return SuccessEnvelope(message="OK", data=EeJobDownloadData(url=url, expires_in=ttl))
+    base = os.path.basename(out_key) or "output"
+    return SuccessEnvelope(
+        message="OK",
+        data=EeJobDownloadData(url=url, expires_in=ttl, format="output", filename=base),
+    )
 
 
 @router.post(
@@ -321,7 +381,8 @@ def ee_output_confirm(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     db.refresh(job)
     has_input = input_render_exists(job)
-    return SuccessEnvelope(message="OK", data=_ee_job_detail(job, has_input_render=has_input))
+    has_xlsx = input_render_excel_exists(job)
+    return SuccessEnvelope(message="OK", data=_ee_job_detail(job, has_input_render=has_input, has_input_excel=has_xlsx))
 
 
 @router.post(
@@ -363,7 +424,8 @@ def ee_job_complete(
     db.commit()
     db.refresh(job)
     has_input = input_render_exists(job)
-    return SuccessEnvelope(message="OK", data=_ee_job_detail(job, has_input_render=has_input))
+    has_xlsx = input_render_excel_exists(job)
+    return SuccessEnvelope(message="OK", data=_ee_job_detail(job, has_input_render=has_input, has_input_excel=has_xlsx))
 
 
 @router.post(
@@ -398,4 +460,5 @@ def ee_job_reopen(
     db.commit()
     db.refresh(job)
     has_input = input_render_exists(job)
-    return SuccessEnvelope(message="OK", data=_ee_job_detail(job, has_input_render=has_input))
+    has_xlsx = input_render_excel_exists(job)
+    return SuccessEnvelope(message="OK", data=_ee_job_detail(job, has_input_render=has_input, has_input_excel=has_xlsx))

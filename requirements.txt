@@ -30,6 +30,7 @@ MarkupSafe==3.0.3
 mdurl==0.1.2
 mmh3==5.2.1
 multidict==6.7.1
+openpyxl==3.1.5
 packaging==26.1
 postgrest==2.28.3
 propcache==0.4.1
