@@ -35,6 +35,22 @@ def _http_exception_message(exc: StarletteHTTPException) -> str:
     return _status_default_message(exc.status_code)
 
 
+def _semantic_error_code(status_code: int) -> str | None:
+    """Machine code for JSON body — never echoes HTTP status number; client uses response status."""
+    return {
+        400: "bad_request",
+        401: "unauthorized",
+        403: "forbidden",
+        404: "not_found",
+        405: "method_not_allowed",
+        409: "conflict",
+        422: "validation_error",
+        429: "too_many_requests",
+        503: "service_unavailable",
+        500: "internal_error",
+    }.get(status_code)
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(
@@ -42,7 +58,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         exc: RequestValidationError,
     ) -> JSONResponse:
         return JSONResponse(
-            status_code=422,
+            status_code=400,
             content=ErrorEnvelope(
                 message="Request validation failed",
                 error=ErrorBody(code="validation_error", details=exc.errors()),
@@ -51,12 +67,12 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(_request: Request, exc: StarletteHTTPException) -> JSONResponse:
-        code = f"http_{exc.status_code}"
+        semantic = _semantic_error_code(exc.status_code)
         detail = exc.detail
         if isinstance(detail, str):
-            err = ErrorBody(code=code, details=None)
+            err = ErrorBody(code=semantic, details=None)
         else:
-            err = ErrorBody(code=code, details=detail)
+            err = ErrorBody(code=semantic, details=detail)
         return JSONResponse(
             status_code=exc.status_code,
             content=ErrorEnvelope(
