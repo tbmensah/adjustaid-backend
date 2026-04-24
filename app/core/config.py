@@ -13,7 +13,10 @@ class Settings(BaseSettings):
 
     app_env: str = Field(
         default="production",
-        description="Application environment: development/dev/local expose richer API errors; production does not.",
+        description=(
+            "Application environment: development/dev/local expose richer API errors, "
+            "stub token helpers, and Swagger/OpenAPI docs; production disables those docs."
+        ),
     )
 
     database_url: str | None = Field(default=None, description="Postgres connection string (pooler is fine for the app).")
