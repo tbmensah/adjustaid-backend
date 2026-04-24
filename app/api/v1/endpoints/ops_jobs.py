@@ -1,3 +1,5 @@
+"""Back-office job queue: all customers' jobs (requires `user_type=back_office`)."""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -5,45 +7,38 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.api.deps import current_user
+from app.api.deps import require_back_office
 from app.db.session import get_db
 from app.models.enums import JobStatus, JobType
 from app.models.users import User
 from app.schemas.envelope import SuccessEnvelope
 from app.schemas.job_history import JobHistoryPage
-from app.services.job_history import list_user_jobs, search_user_jobs_by_original_filename
+from app.services.job_history import list_all_jobs_for_ops, search_all_jobs_for_ops
 
 router = APIRouter()
 
 
 @router.get(
-    "/jobs/search",
-    summary="Search jobs by original file / project name",
+    "/ops/jobs/search",
+    summary="[Back office] Search all jobs by project / file name",
     description=(
-        "Case-insensitive substring match on `jobs.original_filename` (FF: uploaded PDF name; "
-        "EE: project name from wizard). Jobs with no stored name are omitted. "
-        "`draft` jobs are never returned (use FF draft upload + details flow). Scoped to the signed-in user. "
-        "Each item includes `owner_id` (same as your user id here). "
-        "Optional `has_output`, `created_from` / `created_to` match GET /jobs. "
-        "Back office: use `GET /api/v1/ops/jobs/search` for all customers' jobs."
+        "Same filters as `GET /jobs/search` but across **all** customers. "
+        "**403** unless `user_type` is `back_office`. Each item includes `owner_id`."
     ),
 )
-def search_jobs(
+def ops_search_jobs(
     db: Session = Depends(get_db),
-    user: User = Depends(current_user),
+    _: User = Depends(require_back_office),
     q: str = Query(
         ...,
         min_length=1,
         max_length=1024,
         description="Substring to match against `original_filename`.",
     ),
-    job_type: JobType | None = Query(
-        default=None,
-        description="Optional: only ee or ff.",
-    ),
+    job_type: JobType | None = Query(default=None, description="Optional: only ee or ff."),
     status: list[JobStatus] | None = Query(
         default=None,
-        description="Filter by job status (repeat param for multiple). Omit for any status. `draft` never returned.",
+        description="Filter by job status (repeat param for multiple). `draft` never returned.",
     ),
     created_from: datetime | None = Query(
         default=None,
@@ -60,9 +55,8 @@ def search_jobs(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
 ) -> SuccessEnvelope[JobHistoryPage]:
-    items, total = search_user_jobs_by_original_filename(
+    items, total = search_all_jobs_for_ops(
         db,
-        user=user,
         q=q,
         job_type=job_type,
         status=status,
@@ -84,25 +78,23 @@ def search_jobs(
 
 
 @router.get(
-    "/jobs",
-    summary="Job history (EE + FF)",
+    "/ops/jobs",
+    summary="[Back office] List all jobs (paginated)",
     description=(
-        "Paginated list for the signed-in user only. Filter by `job_type` (ee | ff), `status`, "
-        "`created_from` / `created_to` (ISO 8601), `has_output` (EE/FF output file key present). "
-        "`draft` jobs never returned. Each item includes `owner_id`, `status`. "
-        "`token_cost` is 1 when status is completed, else 0. Back office: use `GET /api/v1/ops/jobs`."
+        "Same filters as `GET /jobs` but across **all** customers. "
+        "**403** unless `user_type` is `back_office`. Each item includes `owner_id`."
     ),
 )
-def get_job_history(
+def ops_list_jobs(
     db: Session = Depends(get_db),
-    user: User = Depends(current_user),
+    _: User = Depends(require_back_office),
     job_type: JobType | None = Query(
         default=None,
         description="Restrict to express estimate (ee) or fast fill (ff). Omit for both.",
     ),
     status: list[JobStatus] | None = Query(
         default=None,
-        description="Filter by job status (repeat param for multiple). Omit for any status. `draft` never returned.",
+        description="Filter by job status (repeat param for multiple). `draft` never returned.",
     ),
     created_from: datetime | None = Query(
         default=None,
@@ -119,9 +111,8 @@ def get_job_history(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
 ) -> SuccessEnvelope[JobHistoryPage]:
-    items, total = list_user_jobs(
+    items, total = list_all_jobs_for_ops(
         db,
-        user=user,
         job_type=job_type,
         status=status,
         created_from=created_from,

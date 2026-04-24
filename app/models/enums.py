@@ -1,6 +1,13 @@
 from enum import StrEnum
 
 
+class UserType(StrEnum):
+    """Who the app user is — drives EE API access (back office can process any customer's EE job)."""
+
+    CUSTOMER = "customer"
+    BACK_OFFICE = "back_office"
+
+
 class TokenType(StrEnum):
     EE = "ee"
     FF = "ff"

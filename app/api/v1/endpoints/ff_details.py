@@ -16,6 +16,7 @@ from app.services.ff_job_details import (
     SubmitFfJobDetailsNotFound,
     submit_ff_job_details,
 )
+from app.services.job_token_debit import InsufficientTokensError
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,8 @@ router = APIRouter()
     description=(
         "Requires draft FF job from `GET .../draft-upload`. "
         "Sets `ff_pdf_type`, required `original_filename` (stored on `jobs`), optional storage keys; "
-        "creates `job_details_ff` and moves job to `confirmed`."
+        "creates `job_details_ff` and moves job to `confirmed`. "
+        "Charges the **job owner's** FF balance (`FF_JOB_SUBMIT_TOKEN_COST`, default 1); **402** if insufficient."
     ),
 )
 def submit_ff_job_details_endpoint(
@@ -39,6 +41,11 @@ def submit_ff_job_details_endpoint(
 ) -> SuccessEnvelope[FfJobDetailsData]:
     try:
         job = submit_ff_job_details(db, user=user, job_id=job_id, body=body)
+    except InsufficientTokensError as e:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=str(e),
+        ) from e
     except SubmitFfJobDetailsNotFound:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -15,7 +15,10 @@ class UserMetricsData(BaseModel):
 class JobStatusSummaryData(BaseModel):
     """Counts for the signed-in user; `submitted` = confirmed + queued."""
 
-    draft: int = Field(ge=0)
+    draft: int = Field(
+        ge=0,
+        description="Always 0: draft jobs excluded from this summary (same scope as GET /jobs).",
+    )
     submitted: int = Field(ge=0, description="Jobs with status `confirmed` or `queued`.")
     processing: int = Field(ge=0)
     completed: int = Field(ge=0)

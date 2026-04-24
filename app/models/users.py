@@ -9,6 +9,8 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.models._sqltypes import pg_enum
+from app.models.enums import UserType
 
 # Supabase Auth (`auth.users`) — minimal stub so FK resolution works; Auth owns this table.
 auth_users = Table(
@@ -36,6 +38,11 @@ class User(Base):
     email: Mapped[str] = mapped_column(String, nullable=False, unique=True)
     full_name: Mapped[str] = mapped_column(String, nullable=False)
     company: Mapped[str | None] = mapped_column(String, nullable=True)
+    user_type: Mapped[UserType] = mapped_column(
+        pg_enum(UserType, "user_type_enum"),
+        nullable=False,
+        default=UserType.CUSTOMER,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

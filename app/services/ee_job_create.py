@@ -8,9 +8,10 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models.enums import JobStatus, JobType
+from app.models.enums import JobStatus, JobType, TokenType
 from app.models.jobs import Job, JobDetailsEE
 from app.models.users import User
+from app.services.job_token_debit import InsufficientTokensError, debit_job_tokens, ee_submit_token_cost
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +40,20 @@ def create_ee_job_from_payload(
     details = JobDetailsEE(job_id=job_id, payload=payload)
     db.add(job)
     db.add(details)
+    cost = ee_submit_token_cost()
     try:
+        db.flush()
+        debit_job_tokens(
+            db,
+            wallet_user_id=user.id,
+            job_id=job_id,
+            token_type=TokenType.EE,
+            amount=cost,
+        )
         db.commit()
+    except InsufficientTokensError:
+        db.rollback()
+        raise
     except Exception:
         db.rollback()
         logger.exception("Failed to commit EE job")

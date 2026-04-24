@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.orm import Session
 
 from app.models.billing import TokenWallet
@@ -45,7 +45,7 @@ def get_user_metrics(db: Session, *, user: User) -> UserMetricsData:
 def get_job_status_summary(db: Session, *, user: User) -> JobStatusSummaryData:
     rows = db.execute(
         select(Job.status, func.count())
-        .where(Job.user_id == user.id)
+        .where(Job.user_id == user.id, Job.status != JobStatus.DRAFT)
         .group_by(Job.status)
     ).all()
     counts: dict[JobStatus, int] = {status: int(n) for status, n in rows}
