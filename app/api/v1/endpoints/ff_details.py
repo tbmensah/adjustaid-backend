@@ -12,6 +12,7 @@ from app.models.users import User
 from app.schemas.envelope import SuccessEnvelope
 from app.schemas.ff_job import FfJobDetailsData, FfJobDetailsRequest
 from app.services.ff_job_details import (
+    SubmitFfJobDetailsBadRequest,
     SubmitFfJobDetailsConflict,
     SubmitFfJobDetailsNotFound,
     submit_ff_job_details,
@@ -50,6 +51,11 @@ def submit_ff_job_details_endpoint(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="FF job not found",
+        ) from None
+    except SubmitFfJobDetailsBadRequest as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=e.detail,
         ) from None
     except SubmitFfJobDetailsConflict as e:
         raise HTTPException(

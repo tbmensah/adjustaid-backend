@@ -53,7 +53,7 @@ class TokenLifetimeSummaryData(BaseModel):
 
 
 class StubTokenCreditIn(BaseModel):
-    """Body for dev stub credit (requires STUB_TOKEN_CREDIT_ENABLED)."""
+    """Body for stub credit (requires STUB_TOKEN_CREDIT_ENABLED)."""
 
     token_type: TokenType = Field(description="ee or ff balance to increase.")
     amount: int = Field(ge=1, le=10_000, description="Tokens to credit in one call (capped for safety).")

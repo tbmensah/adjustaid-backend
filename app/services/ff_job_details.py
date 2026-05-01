@@ -27,6 +27,50 @@ class SubmitFfJobDetailsConflict(Exception):
         self.detail = detail
 
 
+class SubmitFfJobDetailsBadRequest(Exception):
+    """Client supplied an invalid storage path on the FF details body."""
+
+    def __init__(self, detail: str) -> None:
+        self.detail = detail
+
+
+def _normalize_owner_path(raw: str) -> str:
+    norm = (raw or "").strip().lstrip("/")
+    if not norm or ".." in norm.split("/"):
+        msg = "invalid storage path"
+        raise ValueError(msg)
+    return norm
+
+
+def _require_pdf_file_key(*, owner_id: uuid.UUID, job_id: uuid.UUID, raw: str | None) -> str:
+    """PDF object lives at the canonical draft-intent path; reject any deviation."""
+    expected = f"{owner_id}/{job_id}"
+    if not raw:
+        return expected
+    try:
+        norm = _normalize_owner_path(raw)
+    except ValueError as e:
+        raise SubmitFfJobDetailsBadRequest(str(e)) from None
+    if norm != expected:
+        msg = "pdf_file_key must match the draft-intent path for this job"
+        raise SubmitFfJobDetailsBadRequest(msg)
+    return norm
+
+
+def _normalize_esx_file_key(*, owner_id: uuid.UUID, raw: str | None) -> str | None:
+    if not raw:
+        return None
+    try:
+        norm = _normalize_owner_path(raw)
+    except ValueError as e:
+        raise SubmitFfJobDetailsBadRequest(str(e)) from None
+    prefix = f"{owner_id}/"
+    if not norm.startswith(prefix):
+        msg = "esx_file_key must reside under the owner's storage namespace"
+        raise SubmitFfJobDetailsBadRequest(msg)
+    return norm
+
+
 def submit_ff_job_details(
     db: Session,
     *,
@@ -52,10 +96,8 @@ def submit_ff_job_details(
         raise SubmitFfJobDetailsConflict("Job details already submitted")
 
     owner_id = job.user_id
-    default_pdf_key = f"{owner_id}/{job_id}"
-    pdf_key = body.pdf_file_key.strip() if body.pdf_file_key else default_pdf_key
-    if not pdf_key:
-        pdf_key = default_pdf_key
+    pdf_key = _require_pdf_file_key(owner_id=owner_id, job_id=job_id, raw=body.pdf_file_key)
+    esx_key = _normalize_esx_file_key(owner_id=owner_id, raw=body.esx_file_key)
 
     job.original_filename = body.original_filename
 
@@ -63,7 +105,7 @@ def submit_ff_job_details(
         job_id=job_id,
         ff_pdf_type=body.ff_pdf_type,
         pdf_file_key=pdf_key,
-        esx_file_key=body.esx_file_key.strip() if body.esx_file_key else None,
+        esx_file_key=esx_key,
     )
     job.status = JobStatus.CONFIRMED
     db.add(details)

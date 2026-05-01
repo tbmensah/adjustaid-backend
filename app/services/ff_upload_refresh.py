@@ -28,9 +28,21 @@ class RefreshFfUploadConflict(Exception):
 
 
 def _object_path_for_job(job: Job, job_id: uuid.UUID, details: JobDetailsFF | None) -> str:
-    if details is not None and details.pdf_file_key:
-        return details.pdf_file_key.strip()
-    return f"{job.user_id}/{job_id}"
+    """
+    Always return a path under `{owner_id}/`. Stored `pdf_file_key` is treated as untrusted
+    (could be a stale or attacker-controlled value from before validation was added) and is
+    used only when it lives in the job owner's namespace; otherwise we fall back to the
+    canonical draft-intent path.
+    """
+    default = f"{job.user_id}/{job_id}"
+    raw = (details.pdf_file_key or "").strip().lstrip("/") if details is not None else ""
+    if not raw:
+        return default
+    if ".." in raw.split("/"):
+        return default
+    if not raw.startswith(f"{job.user_id}/"):
+        return default
+    return raw
 
 
 def refresh_ff_upload_url(
