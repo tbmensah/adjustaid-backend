@@ -114,8 +114,7 @@ def get_token_lifetime(
     summary="Stub: credit tokens (no Stripe)",
     description=(
         "Adds tokens to the signed-in user's wallet and records a `manual_adjustment` ledger row. "
-        "Only when `APP_ENV` is development-like and `STUB_TOKEN_CREDIT_ENABLED=true`. "
-        "Outside dev, responds like an internal error (no stub hints). Replace with Stripe later."
+        "Only when `STUB_TOKEN_CREDIT_ENABLED=true`. Replace with Stripe in production when ready."
     ),
 )
 def post_stub_token_credit(

@@ -14,8 +14,8 @@ class Settings(BaseSettings):
     app_env: str = Field(
         default="production",
         description=(
-            "Application environment: development/dev/local expose richer API errors, "
-            "stub token helpers, and Swagger/OpenAPI docs; production disables those docs."
+            "Application environment: development/dev/local expose richer API errors "
+            "and Swagger/OpenAPI docs; production disables those docs."
         ),
     )
 
@@ -74,7 +74,7 @@ class Settings(BaseSettings):
 
     stub_token_credit_enabled: bool = Field(
         default=False,
-        description="When true and app_env is development-like, POST /api/v1/tokens/stub/credit adds tokens without Stripe.",
+        description="When true, POST /api/v1/tokens/stub/credit adds tokens without Stripe.",
     )
 
     ee_job_submit_token_cost: int = Field(

@@ -1,4 +1,4 @@
-"""Dev-only wallet credits until Stripe checkout is implemented."""
+"""Wallet credits without Stripe when stub endpoint is enabled."""
 
 from __future__ import annotations
 

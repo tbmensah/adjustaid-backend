@@ -22,22 +22,12 @@ from app.models.users import User
 
 
 def require_stub_token_credit_enabled() -> None:
-    """
-    Stub credit only in development-like `APP_ENV`; never leak hints in production.
-
-    Non-dev: 500 + generic message (handler may still sanitize body for 5xx).
-    Dev without flag: 403 + setup hint.
-    """
+    """Stub credit when `STUB_TOKEN_CREDIT_ENABLED=true` (any `APP_ENV`)."""
     s = get_settings()
-    if not s.is_development:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error",
-        )
     if not s.stub_token_credit_enabled:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Stub token credit is disabled (set STUB_TOKEN_CREDIT_ENABLED=true for local/dev).",
+            detail="Stub token credit is disabled (set STUB_TOKEN_CREDIT_ENABLED=true).",
         )
 
 logger = logging.getLogger(__name__)
