@@ -43,6 +43,9 @@ def require_stub_token_credit_enabled() -> None:
 
 logger = logging.getLogger(__name__)
 
+# Tolerate small clock skew between this host and Supabase (iat/exp).
+_JWT_LEEWAY_SECONDS = 60
+
 bearer_scheme = HTTPBearer(
     bearerFormat="JWT",
     description="Supabase session `access_token` (ES256/RS256 via JWKS when `SUPABASE_URL` is set; else HS256 + `SUPABASE_JWT_SECRET`).",
@@ -57,6 +60,29 @@ def _jwks_client(jwks_url: str) -> PyJWKClient:
 
 def _issuer(settings_url: str) -> str:
     return f"{settings_url.rstrip('/')}/auth/v1"
+
+
+def _debug_jwt_time_claims(token: str, err: Exception) -> None:
+    """Print iat/exp vs server clock when JWT time checks fail (dev debugging)."""
+    now = int(datetime.now(timezone.utc).timestamp())
+    try:
+        claims = jwt.decode(
+            token,
+            options={"verify_signature": False, "verify_aud": False, "verify_exp": False},
+        )
+    except Exception as decode_err:
+        print(f"[jwt-debug] could not inspect token: {decode_err}; verify error={err}")
+        return
+    iat = claims.get("iat")
+    exp = claims.get("exp")
+    nbf = claims.get("nbf")
+    iat_delta = (iat - now) if isinstance(iat, int) else None
+    print(
+        "[jwt-debug] "
+        f"error={err!s} | server_now={now} ({datetime.fromtimestamp(now, tz=timezone.utc).isoformat()}) | "
+        f"iat={iat} (delta_vs_now_s={iat_delta}) | nbf={nbf} | exp={exp} | "
+        f"sub={claims.get('sub')!r}"
+    )
 
 
 def _decode_asymmetric(token: str, settings) -> dict[str, Any]:
@@ -91,6 +117,7 @@ def _decode_asymmetric(token: str, settings) -> dict[str, Any]:
             algorithms=[alg] if alg else ["ES256", "RS256"],
             audience="authenticated",
             issuer=iss,
+            leeway=_JWT_LEEWAY_SECONDS,
             options={
                 "verify_signature": True,
                 "verify_exp": True,
@@ -99,6 +126,7 @@ def _decode_asymmetric(token: str, settings) -> dict[str, Any]:
         )
     except InvalidTokenError as e:
         logger.warning("JWT decode failed (asymmetric): %s", e)
+        _debug_jwt_time_claims(token, e)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
@@ -111,6 +139,7 @@ def _decode_hs256(token: str, secret: str) -> dict[str, Any]:
             token,
             secret,
             algorithms=["HS256"],
+            leeway=_JWT_LEEWAY_SECONDS,
             options={
                 "verify_signature": True,
                 "verify_exp": True,
@@ -119,6 +148,7 @@ def _decode_hs256(token: str, secret: str) -> dict[str, Any]:
         )
     except InvalidTokenError as e:
         logger.warning("JWT decode failed (HS256): %s", e)
+        _debug_jwt_time_claims(token, e)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
