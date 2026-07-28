@@ -77,6 +77,15 @@ class Settings(BaseSettings):
         description="When true and app_env is development-like, POST /api/v1/tokens/stub/credit adds tokens without Stripe.",
     )
 
+    app_session_max_age_seconds: int = Field(
+        default=86400,
+        ge=0,
+        description=(
+            "Max age of app session from users.last_login_at (set by POST /api/v1/session/start). "
+            "0 disables the check; otherwise expired/null last_login_at yields 401 app_session_expired."
+        ),
+    )
+
     ee_job_submit_token_cost: int = Field(
         default=1,
         ge=0,

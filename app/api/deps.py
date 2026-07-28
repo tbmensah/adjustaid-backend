@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Any
 
@@ -160,10 +161,24 @@ def jwt_payload(
     )
 
 
+def current_user_allow_expired_session(
+    payload: dict[str, Any] = Depends(jwt_payload),
+    db: Session = Depends(get_db),
+) -> User:
+    """JWT + app user row; skips app-session max-age (for POST /session/start)."""
+    return _load_user_from_jwt(payload, db)
+
+
 def current_user(
     payload: dict[str, Any] = Depends(jwt_payload),
     db: Session = Depends(get_db),
 ) -> User:
+    user = _load_user_from_jwt(payload, db)
+    _ensure_app_session_active(user)
+    return user
+
+
+def _load_user_from_jwt(payload: dict[str, Any], db: Session) -> User:
     sub = payload.get("sub")
     if not sub:
         raise HTTPException(
@@ -184,6 +199,36 @@ def current_user(
             detail="User not found in app — register or sync profile first",
         )
     return user
+
+
+def _ensure_app_session_active(user: User) -> None:
+    """401 app_session_expired when last_login_at is null or older than configured max age."""
+    max_age = get_settings().app_session_max_age_seconds
+    if max_age <= 0:
+        return
+
+    login_at = user.last_login_at
+    if login_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "app_session_expired",
+                "message": "App session expired",
+            },
+        )
+
+    if login_at.tzinfo is None:
+        login_at = login_at.replace(tzinfo=timezone.utc)
+
+    age = (datetime.now(timezone.utc) - login_at).total_seconds()
+    if age > max_age:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "app_session_expired",
+                "message": "App session expired",
+            },
+        )
 
 
 def require_back_office(user: User = Depends(current_user)) -> User:
