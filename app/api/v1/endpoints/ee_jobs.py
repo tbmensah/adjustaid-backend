@@ -100,7 +100,7 @@ def _ee_job_detail(job: Job, *, has_input_render: bool, has_input_excel: bool) -
     "/jobs/ee",
     summary="Submit Express Estimate (JSON object → JSONB)",
     description=(
-        "Express Estimate wizard JSON (camelCase keys). `projectDetails.projectName` and "
+        "Express Estimate wizard JSON (camelCase keys). `projectDetails.insuredName` and "
         "`projectDetails.claimNumber` required; other sections optional; unknown keys rejected. "
         "Stored in `job_details_ee.payload`. Readable `payload.md` / `payload.xlsx` are **not** written here — "
         "back office uploads them via `POST /api/v1/jobs/ee/{job_id}/input-render`. "
@@ -118,7 +118,7 @@ def submit_express_estimate(
                     "summary": "Required project fields only",
                     "value": {
                         "projectDetails": {
-                            "projectName": "Example",
+                            "insuredName": "Jane Doe",
                             "claimNumber": "CLM-001",
                         },
                     },
@@ -127,8 +127,12 @@ def submit_express_estimate(
                     "summary": "Project + optional sections",
                     "value": {
                         "projectDetails": {
-                            "projectName": "Example",
+                            "insuredName": "Jane Doe",
                             "claimNumber": "CLM-001",
+                            "street": "123 Main St",
+                            "city": "Austin",
+                            "zipCode": "78701",
+                            "depreciationRange": "light",
                             "notes": "Optional note",
                         },
                         "exterior": {
