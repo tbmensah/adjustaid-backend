@@ -18,12 +18,407 @@ _SECTION_TITLES: dict[str, str] = {
     "rooms": "Rooms",
 }
 
+# Site form field order (camelCase aliases as stored in payload JSON).
+_ORDER_PROJECT_DETAILS: tuple[str, ...] = (
+    "insuredName",
+    "claimNumber",
+    "street",
+    "city",
+    "zipCode",
+    "depreciationRange",
+    "projectName",
+    "inspectionDate",
+    "propertyAddress",
+    "propertyType",
+    "preFirm",
+    "adjusterName",
+    "notes",
+)
+
+_ORDER_EXTERIOR: tuple[str, ...] = (
+    "pressureWash",
+    "dumpster",
+    "hvac",
+    "electrical",
+    "finishes",
+)
+
+_ORDER_EXTERIOR_FINISHES: tuple[str, ...] = (
+    "exteriorPaint",
+    "siding",
+    "sheathing",
+    "houseWrap",
+    "backerBoard",
+    "wallInsulation",
+)
+
+_ORDER_EXTERIOR_HVAC: tuple[str, ...] = (
+    "condenserUnits",
+    "packageUnits",
+    "miniSplits",
+)
+
+_ORDER_EXTERIOR_ELECTRICAL: tuple[str, ...] = (
+    "exteriorOutlets",
+    "disconnect30Amp",
+    "breakerPanel",
+    "meterBox",
+    "meterBoxQty",
+    "meterBoxSize",
+)
+
+_ORDER_FOUNDATION: tuple[str, ...] = (
+    "crawlspace",
+    "insulation",
+    "enclosureRemoval",
+    "sumpPump",
+    "waterHeater",
+    "waterSoftener",
+    "subgradeAreaCoverage",
+    "hvac",
+    "basement",
+    "electrical",
+    "stairs",
+    "elevator",
+)
+
+_ORDER_FOUNDATION_HVAC: tuple[str, ...] = (
+    "airHandlers",
+    "boiler",
+    "furnace",
+    "baseboardHeat",
+)
+
+_ORDER_FOUNDATION_ELECTRICAL: tuple[str, ...] = (
+    "outlets110",
+    "outlets220",
+    "gfiOutlets",
+    "lightSwitch",
+    "junctionBox",
+    "breakerPanel",
+    "meterBox",
+    "meterBoxQty",
+    "meterBoxSize",
+    "houseRewire",
+)
+
+_ORDER_SUBGRADE: tuple[str, ...] = (
+    "drywall",
+    "wallInsulation",
+    "foundationalDoor",
+    "foundationalWindowsEnabled",
+    "foundationalWindows",
+)
+
+_ORDER_ENCLOSURE_REMOVAL: tuple[str, ...] = (
+    "sandRemoval",
+    "backfill",
+    "confinedSpace",
+)
+
+_ORDER_ROOM: tuple[str, ...] = (
+    "id",
+    "name",
+    "type",
+    "sqft",
+    "nfipCleaning",
+    "flooring",
+    "trim",
+    "wallCovering",
+    "windowsEnabled",
+    "windows",
+    "electrical",
+    "vanity",
+    "pedestalSink",
+    "toilet",
+    "shower",
+    "cabinets",
+    "countertop",
+    "plumbing",
+    "appliances",
+    "doorsEnabled",
+    "doors",
+    "notes",
+)
+
+_ORDER_NFIP_CLEANING: tuple[str, ...] = ("enabled", "wall", "floor")
+_ORDER_NFIP_WALL: tuple[str, ...] = ("height", "wallType", "ceilingAffected")
+_ORDER_NFIP_FLOOR: tuple[str, ...] = ("type", "areaOnCrawlspace")
+
+_ORDER_FLOORING: tuple[str, ...] = (
+    "enabled",
+    "multipleLayers",
+    "layers",
+    "vaporBarrier",
+    "subfloorReplacement",
+    "f9Note",
+)
+
+_ORDER_FLOOR_LAYER: tuple[str, ...] = (
+    "id",
+    "type",
+    "grade",
+    "application",
+    "action",
+    "vaporBarrier",
+    "subfloorReplacement",
+)
+
+_ORDER_TRIM: tuple[str, ...] = (
+    "enabled",
+    "baseboardHeight",
+    "material",
+    "detail",
+    "finish",
+    "cap",
+    "shoe",
+    "shoeFinish",
+    "subtractCabinetry",
+)
+
+_ORDER_WALL_COVERING: tuple[str, ...] = (
+    "enabled",
+    "material",
+    "type",
+    "replacementHeight",
+    "fullWall",
+    "ceilingReplacementAddon",
+    "texture",
+    "textureType",
+    "panelingStyle",
+    "panelingFinish",
+    "panelingGrade",
+    "chairRailAction",
+    "chairRailFinish",
+)
+
+_ORDER_ROOM_ELECTRICAL: tuple[str, ...] = (
+    "enabled",
+    "outlets110",
+    "outlets220",
+    "gfiOutlets",
+    "lightSwitches",
+    "ceilingLights",
+    "ceilingFans",
+    "bathroomLightBar",
+    "bathroomLightBarQty",
+)
+
+_ORDER_WINDOW: tuple[str, ...] = (
+    "id",
+    "type",
+    "material",
+    "size",
+    "grade",
+    "quantity",
+    "finish",
+    "blinds",
+    "casingTrim",
+    "marbleSillReplace",
+    "marbleSillDetach",
+)
+
+_ORDER_DOOR: tuple[str, ...] = (
+    "id",
+    "category",
+    "type",
+    "size",
+    "grade",
+    "finish",
+    "handleAction",
+    "misc",
+    "peepHole",
+    "mailSlot",
+    "nonCased",
+    "casedOpening",
+    "casingOpeningSize",
+    "casingFinish",
+    "sidelites",
+    "sidelitesQty",
+    "sidelitesSize",
+    "sidelitesGrade",
+    "panelSize",
+    "panelGrade",
+    "stormdoorAssembly",
+    "retrofitInStucco",
+    "cleanSensor",
+    "replaceSensor",
+)
+
+_ORDER_VANITY: tuple[str, ...] = (
+    "enabled",
+    "size",
+    "grade",
+    "detachAndReset",
+    "countertop",
+    "backsplashUnattached",
+    "backsplashAction",
+)
+
+_ORDER_VANITY_COUNTERTOP: tuple[str, ...] = (
+    "type",
+    "grade",
+    "size",
+    "pStop",
+    "sink",
+    "action",
+    "faucet",
+    "faucetAction",
+)
+
+_ORDER_KITCHEN_COUNTERTOP: tuple[str, ...] = (
+    "enabled",
+    "type",
+    "grade",
+    "size",
+    "detachAndReset",
+    "action",
+)
+
+_ORDER_CABINETS: tuple[str, ...] = (
+    "enabled",
+    "size",
+    "grade",
+    "detachAndReset",
+    "toeKick",
+)
+
+_ORDER_SHOWER: tuple[str, ...] = (
+    "enabled",
+    "type",
+    "detachAndReset",
+    "showerFaucet",
+    "actionForTub",
+    "jetted",
+    "jettedMotorReplace",
+    "surround",
+    "tubShowerFaucet",
+    "mortarBedReplace",
+    "mortarBedSize",
+    "tileCurb",
+    "tileCurbSize",
+    "walls",
+    "tileBench",
+    "tileNiche",
+    "tileNicheQty",
+    "towelBar",
+    "tileSoapDish",
+    "tileSoapDishQty",
+    "grabBar",
+    "grabBarQty",
+    "tileFeatureStrip",
+    "glassDoor",
+    "glassDoorAction",
+)
+
+_ORDER_APPLIANCES: tuple[str, ...] = (
+    "enabled",
+    "refrigerator",
+    "dishwasher",
+    "range",
+    "cooktop",
+    "waterHeater",
+    "wallOven",
+    "airHandler",
+    "boiler",
+    "furnace",
+    "baseboardHeat",
+)
+
+_ORDER_PLUMBING: tuple[str, ...] = (
+    "replaceFaucetSink",
+    "drFaucetSink",
+    "waterSupplyLine",
+    "reverseOsmosis",
+    "garbageDisposal",
+)
+
+_ORDER_BREAKER_PANEL: tuple[str, ...] = (
+    "enabled",
+    "amps",
+    "arcFaults",
+    "panelReplacement",
+    "circuitReplacement",
+    "panelType",
+    "circuits",
+)
+
+# Unique last-path-segment → order (no exterior/foundation ambiguity).
+_ORDERS_BY_KEY: dict[str, tuple[str, ...]] = {
+    "projectDetails": _ORDER_PROJECT_DETAILS,
+    "exterior": _ORDER_EXTERIOR,
+    "foundation": _ORDER_FOUNDATION,
+    "finishes": _ORDER_EXTERIOR_FINISHES,
+    "subgradeAreaCoverage": _ORDER_SUBGRADE,
+    "enclosureRemoval": _ORDER_ENCLOSURE_REMOVAL,
+    "nfipCleaning": _ORDER_NFIP_CLEANING,
+    "wall": _ORDER_NFIP_WALL,
+    "floor": _ORDER_NFIP_FLOOR,
+    "flooring": _ORDER_FLOORING,
+    "trim": _ORDER_TRIM,
+    "wallCovering": _ORDER_WALL_COVERING,
+    "vanity": _ORDER_VANITY,
+    "shower": _ORDER_SHOWER,
+    "appliances": _ORDER_APPLIANCES,
+    "plumbing": _ORDER_PLUMBING,
+    "cabinets": _ORDER_CABINETS,
+    "breakerPanel": _ORDER_BREAKER_PANEL,
+}
+
+# Path suffix → order for ambiguous or room-scoped keys.
+_ORDERS_BY_PATH_SUFFIX: dict[tuple[str, ...], tuple[str, ...]] = {
+    ("exterior", "hvac"): _ORDER_EXTERIOR_HVAC,
+    ("exterior", "electrical"): _ORDER_EXTERIOR_ELECTRICAL,
+    ("foundation", "hvac"): _ORDER_FOUNDATION_HVAC,
+    ("foundation", "electrical"): _ORDER_FOUNDATION_ELECTRICAL,
+    ("rooms",): _ORDER_ROOM,
+    ("rooms", "electrical"): _ORDER_ROOM_ELECTRICAL,
+    ("rooms", "windows"): _ORDER_WINDOW,
+    ("rooms", "doors"): _ORDER_DOOR,
+    ("rooms", "vanity", "countertop"): _ORDER_VANITY_COUNTERTOP,
+    ("rooms", "countertop"): _ORDER_KITCHEN_COUNTERTOP,
+    ("foundation", "subgradeAreaCoverage", "foundationalWindows"): _ORDER_WINDOW,
+    ("rooms", "flooring", "layers"): _ORDER_FLOOR_LAYER,
+}
+
+
+def _ordered_keys(obj: dict[str, Any], order: tuple[str, ...] | None) -> list[str]:
+    """Emit keys in form order when known; unknown keys keep insertion order after."""
+    if not order:
+        return list(obj.keys())
+    seen: set[str] = set()
+    out: list[str] = []
+    for k in order:
+        if k in obj:
+            out.append(k)
+            seen.add(k)
+    for k in obj:
+        if k not in seen:
+            out.append(k)
+    return out
+
+
+def _order_for(path: tuple[str, ...]) -> tuple[str, ...] | None:
+    if not path:
+        return None
+    for i in range(len(path)):
+        suffix = path[i:]
+        if suffix in _ORDERS_BY_PATH_SUFFIX:
+            return _ORDERS_BY_PATH_SUFFIX[suffix]
+    leaf = path[-1]
+    return _ORDERS_BY_KEY.get(leaf)
+
+
+def _should_skip_branch(val: Any) -> bool:
+    """Omit whole objects toggled off on the form (`enabled: false`)."""
+    return isinstance(val, dict) and val.get("enabled") is False
+
 
 def _indent(level: int) -> str:
     return "  " * level
 
 
-def _render_value(val: Any, level: int) -> list[str]:
+def _render_value(val: Any, level: int, path: tuple[str, ...] = ()) -> list[str]:
     ind = _indent(level)
     if val is None:
         return [f"{ind}- _(none)_"]
@@ -40,23 +435,29 @@ def _render_value(val: Any, level: int) -> list[str]:
         out: list[str] = []
         for i, item in enumerate(val):
             if isinstance(item, dict):
+                if _should_skip_branch(item):
+                    continue
                 label = item.get("name") or item.get("id")
                 title = f"Entry {i + 1}" + (f" — {label}" if label is not None else "")
                 out.append(f"{ind}- **{title}**")
-                out.extend(_render_value(item, level + 1))
+                # Room entries and other list objects use the list's path for field order.
+                out.extend(_render_value(item, level + 1, path))
             else:
-                out.extend(_render_value(item, level))
-        return out
+                out.extend(_render_value(item, level, path))
+        return out if out else [f"{ind}- _(empty list)_"]
     if isinstance(val, dict):
         if not val:
             return [f"{ind}- _(empty)_"]
         out = []
-        for k in sorted(val.keys(), key=str):
+        for k in _ordered_keys(val, _order_for(path)):
             v = val[k]
+            if _should_skip_branch(v):
+                continue
             key_label = str(k)
+            child_path = path + (k,)
             if isinstance(v, (dict, list)):
                 out.append(f"{ind}- **{key_label}**")
-                out.extend(_render_value(v, level + 1))
+                out.extend(_render_value(v, level + 1, child_path))
             elif v is None:
                 out.append(f"{ind}- **{key_label}**: _(none)_")
             elif isinstance(v, bool):
@@ -67,7 +468,7 @@ def _render_value(val: Any, level: int) -> list[str]:
                 out.append(f"{ind}- **{key_label}**: {v if v else '_(empty)_'}")
             else:
                 out.append(f"{ind}- **{key_label}**: `{json.dumps(v, default=str)}`")
-        return out
+        return out if out else [f"{ind}- _(empty)_"]
     return [f"{ind}- `{json.dumps(val, default=str)}`"]
 
 
@@ -96,11 +497,13 @@ def render_payload_markdown(payload: dict[str, Any]) -> str:
         chunk = payload[key]
         if chunk is None:
             lines.append("_Not provided._")
+        elif _should_skip_branch(chunk):
+            lines.append("_Not provided._")
         else:
-            lines.extend(_render_value(chunk, 0))
+            lines.extend(_render_value(chunk, 0, (key,)))
         lines.append("")
 
-    other_keys = sorted(k for k in payload if k not in seen)
+    other_keys = [k for k in payload if k not in seen]
     for key in other_keys:
         lines.append(f"## {key}")
         lines.append("")
@@ -108,7 +511,7 @@ def render_payload_markdown(payload: dict[str, Any]) -> str:
         if chunk is None:
             lines.append("_Not provided._")
         elif isinstance(chunk, (dict, list)):
-            lines.extend(_render_value(chunk, 0))
+            lines.extend(_render_value(chunk, 0, (key,)))
         else:
             lines.append(json.dumps(chunk, indent=2, default=str))
         lines.append("")
@@ -161,9 +564,17 @@ def _section_title(key: str) -> str:
     return _SECTION_TITLES.get(key, _humanize_key(key))
 
 
-def _walk_section(section: str, val: Any, label_parts: list[str], rows: list[tuple[str, str, str]]) -> None:
+def _walk_section(
+    section: str,
+    val: Any,
+    label_parts: list[str],
+    rows: list[tuple[str, str, str]],
+    path: tuple[str, ...] = (),
+) -> None:
     if val is None:
         rows.append((section, _JOIN.join(label_parts) if label_parts else "(empty)", "—"))
+        return
+    if _should_skip_branch(val):
         return
     if isinstance(val, (bool, int, float, str)):
         rows.append((section, _JOIN.join(label_parts) if label_parts else "(value)", _cell_value(val)))
@@ -172,8 +583,11 @@ def _walk_section(section: str, val: Any, label_parts: list[str], rows: list[tup
         if not val:
             rows.append((section, _JOIN.join(label_parts) if label_parts else "(empty)", "—"))
             return
-        for k in sorted(val.keys(), key=str):
-            _walk_section(section, val[k], label_parts + [_humanize_key(k)], rows)
+        for k in _ordered_keys(val, _order_for(path)):
+            child = val[k]
+            if _should_skip_branch(child):
+                continue
+            _walk_section(section, child, label_parts + [_humanize_key(k)], rows, path + (k,))
         return
     if isinstance(val, list):
         if not val:
@@ -181,6 +595,8 @@ def _walk_section(section: str, val: Any, label_parts: list[str], rows: list[tup
             return
         for i, item in enumerate(val):
             if isinstance(item, dict):
+                if _should_skip_branch(item):
+                    continue
                 nm = item.get("name")
                 rid = item.get("id")
                 extra = ""
@@ -195,10 +611,10 @@ def _walk_section(section: str, val: Any, label_parts: list[str], rows: list[tup
                 else:
                     head = f"Entry {i + 1}{extra}"
                 base = label_parts[:-1] + [head] if label_parts else [head]
-                _walk_section(section, item, base, rows)
+                _walk_section(section, item, base, rows, path)
             else:
                 ip = (label_parts + [f"Item {i + 1}"]) if label_parts else [f"Item {i + 1}"]
-                _walk_section(section, item, ip, rows)
+                _walk_section(section, item, ip, rows, path)
         return
     rows.append((section, _JOIN.join(label_parts) if label_parts else "(value)", _cell_value(val)))
 
@@ -217,14 +633,14 @@ def _user_friendly_rows(payload: dict[str, Any]) -> list[tuple[str, str, str]]:
         if chunk is None:
             rows.append((sec, "—", "Not provided"))
         else:
-            _walk_section(sec, chunk, [], rows)
-    for key in sorted(k for k in payload if k not in seen):
+            _walk_section(sec, chunk, [], rows, (key,))
+    for key in (k for k in payload if k not in seen):
         sec = _section_title(key)
         chunk = payload[key]
         if chunk is None:
             rows.append((sec, "—", "Not provided"))
         elif isinstance(chunk, (dict, list)):
-            _walk_section(sec, chunk, [], rows)
+            _walk_section(sec, chunk, [], rows, (key,))
         else:
             rows.append((sec, _humanize_key(key), _cell_value(chunk)))
     return rows

@@ -44,7 +44,8 @@ from app.services.ee_output_upload import (
 
 logger = logging.getLogger(__name__)
 
-# EE routes: customers create jobs only; back_office processes any job. Readable `payload.md` upload/download is back-office only.
+# EE routes: any authenticated user may create jobs; back_office also processes any job.
+# Readable `payload.md` upload/download is back-office only.
 router = APIRouter()
 
 _EXCEL_FORMAT_ALIASES = frozenset({"excel", "xlsx", "spreadsheet", "sheet", "sheets"})
@@ -105,7 +106,7 @@ def _ee_job_detail(job: Job, *, has_input_render: bool, has_input_excel: bool) -
         "Stored in `job_details_ee.payload`. Readable `payload.md` / `payload.xlsx` are **not** written here — "
         "back office uploads them via `POST /api/v1/jobs/ee/{job_id}/input-render`. "
         "`input_render_ready` is always false on this response until ops has uploaded. "
-        "**Customer accounts only** — back-office users cannot create jobs here. "
+        "Customers and **back-office** accounts may create jobs (back office also has ops privileges). "
         "Requires sufficient EE token balance (`EE_JOB_SUBMIT_TOKEN_COST`, default 1); otherwise **402**."
     ),
 )
@@ -147,11 +148,6 @@ def submit_express_estimate(
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ) -> SuccessEnvelope[EeJobCreatedData]:
-    if user.user_type == UserType.BACK_OFFICE:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Back-office accounts cannot submit Express Estimates. Use a customer account to create a job.",
-        )
     try:
         stored = payload.model_dump(mode="json", exclude_unset=True, by_alias=True)
         job = create_ee_job_from_payload(db, user=user, payload=stored)

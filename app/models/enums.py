@@ -2,7 +2,7 @@ from enum import StrEnum
 
 
 class UserType(StrEnum):
-    """Who the app user is — drives EE API access (back office can process any customer's EE job)."""
+    """App role: customers submit jobs; back_office may submit and process any customer's EE job."""
 
     CUSTOMER = "customer"
     BACK_OFFICE = "back_office"
