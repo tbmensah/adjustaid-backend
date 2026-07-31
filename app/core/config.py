@@ -77,6 +77,23 @@ class Settings(BaseSettings):
         description="When true, POST /api/v1/tokens/stub/credit adds tokens without Stripe.",
     )
 
+    app_session_max_age_seconds: int = Field(
+        default=86400,
+        ge=0,
+        description=(
+            "Max age of app session from users.last_login_at (set by POST /api/v1/session/start). "
+            "0 disables the check; otherwise expired/null last_login_at yields 401 app_session_expired."
+        ),
+    )
+    app_session_start_min_interval_seconds: int = Field(
+        default=60,
+        ge=0,
+        description=(
+            "Minimum seconds between POST /api/v1/session/start for the same user "
+            "(based on last_login_at). 0 disables. Exceeded → 429 session_start_rate_limited."
+        ),
+    )
+
     ee_job_submit_token_cost: int = Field(
         default=1,
         ge=0,

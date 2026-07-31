@@ -34,6 +34,10 @@ def _http_exception_message(exc: StarletteHTTPException) -> str:
     d = exc.detail
     if isinstance(d, str) and d.strip():
         return d
+    if isinstance(d, dict):
+        msg = d.get("message")
+        if isinstance(msg, str) and msg.strip():
+            return msg
     return _status_default_message(exc.status_code)
 
 
@@ -52,6 +56,15 @@ def _semantic_error_code(status_code: int) -> str | None:
         503: "service_unavailable",
         500: "internal_error",
     }.get(status_code)
+
+
+def _error_code_from_detail(detail: object, fallback: str | None) -> str | None:
+    """Prefer structured detail["code"] when present (e.g. app_session_expired)."""
+    if isinstance(detail, dict):
+        code = detail.get("code")
+        if isinstance(code, str) and code.strip():
+            return code.strip()
+    return fallback
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -81,10 +94,15 @@ def register_exception_handlers(app: FastAPI) -> None:
                 ).model_dump(),
             )
         detail = exc.detail
+        code = _error_code_from_detail(detail, semantic)
         if isinstance(detail, str):
-            err = ErrorBody(code=semantic, details=None)
+            err = ErrorBody(code=code, details=None)
+        elif isinstance(detail, dict):
+            # code/message are envelope fields; leave any remaining keys in details
+            leftover = {k: v for k, v in detail.items() if k not in ("code", "message")}
+            err = ErrorBody(code=code, details=leftover or None)
         else:
-            err = ErrorBody(code=semantic, details=detail)
+            err = ErrorBody(code=code, details=detail)
         return JSONResponse(
             status_code=exc.status_code,
             content=ErrorEnvelope(
