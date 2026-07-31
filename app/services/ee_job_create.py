@@ -26,9 +26,11 @@ def create_ee_job_from_payload(
     display_name: str | None = None
     pd = payload.get("projectDetails")
     if isinstance(pd, dict):
-        pn = pd.get("projectName")
-        if isinstance(pn, str) and pn.strip():
-            display_name = pn.strip()
+        for key in ("projectName", "insuredName", "claimNumber"):
+            val = pd.get(key)
+            if isinstance(val, str) and val.strip():
+                display_name = val.strip()
+                break
 
     job = Job(
         id=job_id,

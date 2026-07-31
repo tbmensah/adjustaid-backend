@@ -76,9 +76,11 @@ def render_payload_markdown(payload: dict[str, Any]) -> str:
     title = "Express Estimate"
     pd = payload.get("projectDetails")
     if isinstance(pd, dict):
-        pn = pd.get("projectName")
-        if isinstance(pn, str) and pn.strip():
-            title = f"Express Estimate — {pn.strip()}"
+        for key in ("projectName", "insuredName", "claimNumber"):
+            val = pd.get(key)
+            if isinstance(val, str) and val.strip():
+                title = f"Express Estimate — {val.strip()}"
+                break
 
     lines: list[str] = [f"# {title}", ""]
     known_order = ("projectDetails", "exterior", "foundation", "rooms")
@@ -233,9 +235,11 @@ def render_payload_xlsx_bytes(payload: dict[str, Any]) -> bytes:
     title = "Express Estimate"
     pd = payload.get("projectDetails")
     if isinstance(pd, dict):
-        pn = pd.get("projectName")
-        if isinstance(pn, str) and pn.strip():
-            title = f"Express Estimate — {pn.strip()}"
+        for key in ("projectName", "insuredName", "claimNumber"):
+            val = pd.get(key)
+            if isinstance(val, str) and val.strip():
+                title = f"Express Estimate — {val.strip()}"
+                break
 
     data_rows = _user_friendly_rows(payload)
 
