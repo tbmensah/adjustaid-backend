@@ -1,7 +1,7 @@
 """Express Estimate wizard payload — Pydantic mirror of frontend Zod (deep-partial, extra forbidden).
 
 Wire JSON uses camelCase aliases; Python attrs are snake_case. Root requires ``project_details``
-with non-empty ``project_name`` and ``claim_number``.
+with non-empty ``insured_name`` and ``claim_number``.
 """
 
 from __future__ import annotations
@@ -48,6 +48,9 @@ class DoorItem(BaseModel):
     peep_hole: bool | None = Field(default=None, alias="peepHole")
     mail_slot: bool | None = Field(default=None, alias="mailSlot")
     non_cased: bool | None = Field(default=None, alias="nonCased")
+    cased_opening: bool | None = Field(default=None, alias="casedOpening")
+    casing_opening_size: str | None = Field(default=None, alias="casingOpeningSize")
+    casing_finish: str | None = Field(default=None, alias="casingFinish")
     sidelites: bool | None = Field(default=None, alias="sidelites")
     sidelites_qty: str | None = Field(default=None, alias="sidelitesQty")
     sidelites_size: str | None = Field(default=None, alias="sidelitesSize")
@@ -120,6 +123,8 @@ class WallCoveringOptions(BaseModel):
     material: str | None = Field(default=None, alias="material")
     type: str | None = Field(default=None, alias="type")
     replacement_height: str | None = Field(default=None, alias="replacementHeight")
+    full_wall: bool | None = Field(default=None, alias="fullWall")
+    ceiling_replacement_addon: bool | None = Field(default=None, alias="ceilingReplacementAddon")
     texture: bool | None = Field(default=None, alias="texture")
     texture_type: str | None = Field(default=None, alias="textureType")
     paneling_style: str | None = Field(default=None, alias="panelingStyle")
@@ -165,6 +170,12 @@ class VanityOptions(BaseModel):
     backsplash_action: str | None = Field(default=None, alias="backsplashAction")
 
 
+class PedestalSinkOptions(BaseModel):
+    model_config = _EE
+    enabled: bool | None = Field(default=None, alias="enabled")
+    action: str | None = Field(default=None, alias="action")
+
+
 class ToiletOptions(BaseModel):
     model_config = _EE
     enabled: bool | None = Field(default=None, alias="enabled")
@@ -186,6 +197,8 @@ class ShowerOptions(BaseModel):
     tub_shower_faucet: str | None = Field(default=None, alias="tubShowerFaucet")
     mortar_bed_replace: bool | None = Field(default=None, alias="mortarBedReplace")
     mortar_bed_size: str | None = Field(default=None, alias="mortarBedSize")
+    tile_curb: bool | None = Field(default=None, alias="tileCurb")
+    tile_curb_size: str | None = Field(default=None, alias="tileCurbSize")
     walls: str | None = Field(default=None, alias="walls")
     tile_bench: bool | None = Field(default=None, alias="tileBench")
     tile_niche: bool | None = Field(default=None, alias="tileNiche")
@@ -225,6 +238,7 @@ class CountertopOptions(BaseModel):
     grade: str | None = Field(default=None, alias="grade")
     size: str | None = Field(default=None, alias="size")
     detach_and_reset: bool | None = Field(default=None, alias="detachAndReset")
+    action: str | None = Field(default=None, alias="action")
 
 
 class PlumbingWaterSupplyLine(BaseModel):
@@ -312,6 +326,12 @@ class ApplianceWallOven(BaseModel):
     f9_note: str | None = Field(default=None, alias="f9Note")
 
 
+class ApplianceAirHandlerACoil(BaseModel):
+    model_config = _EE
+    enabled: bool | None = Field(default=None, alias="enabled")
+    detach_and_reset: bool | None = Field(default=None, alias="detachAndReset")
+
+
 class ApplianceAirHandler(BaseModel):
     model_config = _EE
     enabled: bool | None = Field(default=None, alias="enabled")
@@ -319,6 +339,15 @@ class ApplianceAirHandler(BaseModel):
     options: str | None = Field(default=None, alias="options")
     action: str | None = Field(default=None, alias="action")
     f9_note: str | None = Field(default=None, alias="f9Note")
+    a_coil: ApplianceAirHandlerACoil | None = Field(default=None, alias="aCoil")
+
+
+class ApplianceFurnace(BaseModel):
+    model_config = _EE
+    enabled: bool | None = Field(default=None, alias="enabled")
+    type: str | None = Field(default=None, alias="type")
+    btu: str | None = Field(default=None, alias="btu")
+    high_efficiency: bool | None = Field(default=None, alias="highEfficiency")
 
 
 class ApplianceBoiler(BaseModel):
@@ -350,6 +379,7 @@ class ApplianceOptions(BaseModel):
     wall_oven: ApplianceWallOven | None = Field(default=None, alias="wallOven")
     air_handler: ApplianceAirHandler | None = Field(default=None, alias="airHandler")
     boiler: ApplianceBoiler | None = Field(default=None, alias="boiler")
+    furnace: ApplianceFurnace | None = Field(default=None, alias="furnace")
     baseboard_heat: ApplianceBaseboardHeat | None = Field(default=None, alias="baseboardHeat")
 
 
@@ -369,18 +399,26 @@ class Room(BaseModel):
     doors_enabled: bool | None = Field(default=None, alias="doorsEnabled")
     doors: list[DoorItem] | None = Field(default=None, alias="doors")
     vanity: VanityOptions | None = Field(default=None, alias="vanity")
+    pedestal_sink: PedestalSinkOptions | None = Field(default=None, alias="pedestalSink")
     toilet: ToiletOptions | None = Field(default=None, alias="toilet")
     shower: ShowerOptions | None = Field(default=None, alias="shower")
     cabinets: CabinetOptions | None = Field(default=None, alias="cabinets")
     countertop: CountertopOptions | None = Field(default=None, alias="countertop")
     plumbing: PlumbingOptions | None = Field(default=None, alias="plumbing")
     appliances: ApplianceOptions | None = Field(default=None, alias="appliances")
+    notes: str | None = Field(default=None, alias="notes")
 
 
 class ProjectDetails(BaseModel):
     model_config = _EE
-    project_name: str = Field(min_length=1, alias="projectName")
+    insured_name: str = Field(min_length=1, alias="insuredName")
     claim_number: str = Field(min_length=1, alias="claimNumber")
+    street: str | None = Field(default=None, alias="street")
+    city: str | None = Field(default=None, alias="city")
+    zip_code: str | None = Field(default=None, alias="zipCode")
+    depreciation_range: str | None = Field(default=None, alias="depreciationRange")
+    # Legacy / optional fields (older clients)
+    project_name: str | None = Field(default=None, alias="projectName")
     inspection_date: str | None = Field(default=None, alias="inspectionDate")
     property_address: str | None = Field(default=None, alias="propertyAddress")
     property_type: str | None = Field(default=None, alias="propertyType")
@@ -388,7 +426,7 @@ class ProjectDetails(BaseModel):
     adjuster_name: str | None = Field(default=None, alias="adjusterName")
     notes: str | None = Field(default=None, alias="notes")
 
-    @field_validator("project_name", "claim_number", mode="before")
+    @field_validator("insured_name", "claim_number", "project_name", mode="before")
     @classmethod
     def _strip_required_strings(cls, v: object) -> object:
         if isinstance(v, str):
@@ -468,6 +506,7 @@ class ExteriorElectrical(BaseModel):
     breaker_panel: ExteriorBreakerPanel | None = Field(default=None, alias="breakerPanel")
     meter_box: bool | None = Field(default=None, alias="meterBox")
     meter_box_qty: str | None = Field(default=None, alias="meterBoxQty")
+    meter_box_size: str | None = Field(default=None, alias="meterBoxSize")
 
 
 class ExteriorPaintEnabled(BaseModel):
@@ -506,6 +545,8 @@ class ExteriorWallInsulation(BaseModel):
     model_config = _EE
     enabled: bool | None = Field(default=None, alias="enabled")
     type: str | None = Field(default=None, alias="type")
+    batt_rating: str | None = Field(default=None, alias="battRating")
+    spray_foam_cell_type: str | None = Field(default=None, alias="sprayFoamCellType")
     replacement_height: str | None = Field(default=None, alias="replacementHeight")
 
 
@@ -542,12 +583,31 @@ class FoundationWindowRow(BaseModel):
     material: str | None = Field(default=None, alias="material")
 
 
+class FoundationACoil(BaseModel):
+    model_config = _EE
+    enabled: bool | None = Field(default=None, alias="enabled")
+    detach_and_reset: bool | None = Field(default=None, alias="detachAndReset")
+    action: str | None = Field(default=None, alias="action")
+    f9_note: str | None = Field(default=None, alias="f9Note")
+
+
 class FoundationAirHandlerRow(BaseModel):
     model_config = _EE
     id: float | None = Field(default=None, alias="id")
     type: str | None = Field(default=None, alias="type")
     tonnage: str | None = Field(default=None, alias="tonnage")
     heat_element_count: str | None = Field(default=None, alias="heatElementCount")
+    action: str | None = Field(default=None, alias="action")
+    f9_note: str | None = Field(default=None, alias="f9Note")
+    a_coil: FoundationACoil | None = Field(default=None, alias="aCoil")
+
+
+class FoundationFurnace(BaseModel):
+    model_config = _EE
+    enabled: bool | None = Field(default=None, alias="enabled")
+    type: str | None = Field(default=None, alias="type")
+    btu: str | None = Field(default=None, alias="btu")
+    high_efficiency: bool | None = Field(default=None, alias="highEfficiency")
     action: str | None = Field(default=None, alias="action")
     f9_note: str | None = Field(default=None, alias="f9Note")
 
@@ -605,6 +665,9 @@ class FoundationInsulation(BaseModel):
     belly_paper: bool | None = Field(default=None, alias="bellyPaper")
     floor_insulation: bool | None = Field(default=None, alias="floorInsulation")
     floor_insulation_type: str | None = Field(default=None, alias="floorInsulationType")
+    floor_insulation_replacement_height: str | None = Field(
+        default=None, alias="floorInsulationReplacementHeight"
+    )
     confined_space: bool | None = Field(default=None, alias="confinedSpace")
 
 
@@ -690,6 +753,7 @@ class FoundationBaseboardHeat(BaseModel):
 class FoundationHvac(BaseModel):
     model_config = _EE
     air_handlers: list[FoundationAirHandlerRow] | None = Field(default=None, alias="airHandlers")
+    furnace: FoundationFurnace | None = Field(default=None, alias="furnace")
     boiler: FoundationBoiler | None = Field(default=None, alias="boiler")
     baseboard_heat: FoundationBaseboardHeat | None = Field(default=None, alias="baseboardHeat")
 
@@ -737,6 +801,7 @@ class FoundationElectrical(BaseModel):
     breaker_panel: FoundationBreakerPanel | None = Field(default=None, alias="breakerPanel")
     meter_box: bool | None = Field(default=None, alias="meterBox")
     meter_box_qty: str | None = Field(default=None, alias="meterBoxQty")
+    meter_box_size: str | None = Field(default=None, alias="meterBoxSize")
     house_rewire: FoundationHouseRewire | None = Field(default=None, alias="houseRewire")
 
 

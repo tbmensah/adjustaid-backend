@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Any
 
@@ -42,6 +43,9 @@ def require_stub_token_credit_enabled() -> None:
 
 logger = logging.getLogger(__name__)
 
+# Tolerate small clock skew between this host and Supabase (iat/exp).
+_JWT_LEEWAY_SECONDS = 60
+
 bearer_scheme = HTTPBearer(
     bearerFormat="JWT",
     description="Supabase session `access_token` (ES256/RS256 via JWKS when `SUPABASE_URL` is set; else HS256 + `SUPABASE_JWT_SECRET`).",
@@ -56,6 +60,29 @@ def _jwks_client(jwks_url: str) -> PyJWKClient:
 
 def _issuer(settings_url: str) -> str:
     return f"{settings_url.rstrip('/')}/auth/v1"
+
+
+def _debug_jwt_time_claims(token: str, err: Exception) -> None:
+    """Print iat/exp vs server clock when JWT time checks fail (dev debugging)."""
+    now = int(datetime.now(timezone.utc).timestamp())
+    try:
+        claims = jwt.decode(
+            token,
+            options={"verify_signature": False, "verify_aud": False, "verify_exp": False},
+        )
+    except Exception as decode_err:
+        print(f"[jwt-debug] could not inspect token: {decode_err}; verify error={err}")
+        return
+    iat = claims.get("iat")
+    exp = claims.get("exp")
+    nbf = claims.get("nbf")
+    iat_delta = (iat - now) if isinstance(iat, int) else None
+    print(
+        "[jwt-debug] "
+        f"error={err!s} | server_now={now} ({datetime.fromtimestamp(now, tz=timezone.utc).isoformat()}) | "
+        f"iat={iat} (delta_vs_now_s={iat_delta}) | nbf={nbf} | exp={exp} | "
+        f"sub={claims.get('sub')!r}"
+    )
 
 
 def _decode_asymmetric(token: str, settings) -> dict[str, Any]:
@@ -90,6 +117,7 @@ def _decode_asymmetric(token: str, settings) -> dict[str, Any]:
             algorithms=[alg] if alg else ["ES256", "RS256"],
             audience="authenticated",
             issuer=iss,
+            leeway=_JWT_LEEWAY_SECONDS,
             options={
                 "verify_signature": True,
                 "verify_exp": True,
@@ -98,6 +126,7 @@ def _decode_asymmetric(token: str, settings) -> dict[str, Any]:
         )
     except InvalidTokenError as e:
         logger.warning("JWT decode failed (asymmetric): %s", e)
+        _debug_jwt_time_claims(token, e)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
@@ -110,6 +139,7 @@ def _decode_hs256(token: str, secret: str) -> dict[str, Any]:
             token,
             secret,
             algorithms=["HS256"],
+            leeway=_JWT_LEEWAY_SECONDS,
             options={
                 "verify_signature": True,
                 "verify_exp": True,
@@ -118,6 +148,7 @@ def _decode_hs256(token: str, secret: str) -> dict[str, Any]:
         )
     except InvalidTokenError as e:
         logger.warning("JWT decode failed (HS256): %s", e)
+        _debug_jwt_time_claims(token, e)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",
@@ -160,10 +191,24 @@ def jwt_payload(
     )
 
 
+def current_user_allow_expired_session(
+    payload: dict[str, Any] = Depends(jwt_payload),
+    db: Session = Depends(get_db),
+) -> User:
+    """JWT + app user row; skips app-session max-age (for POST /session/start)."""
+    return _load_user_from_jwt(payload, db)
+
+
 def current_user(
     payload: dict[str, Any] = Depends(jwt_payload),
     db: Session = Depends(get_db),
 ) -> User:
+    user = _load_user_from_jwt(payload, db)
+    _ensure_app_session_active(user)
+    return user
+
+
+def _load_user_from_jwt(payload: dict[str, Any], db: Session) -> User:
     sub = payload.get("sub")
     if not sub:
         raise HTTPException(
@@ -184,6 +229,36 @@ def current_user(
             detail="User not found in app — register or sync profile first",
         )
     return user
+
+
+def _ensure_app_session_active(user: User) -> None:
+    """401 app_session_expired when last_login_at is null or older than configured max age."""
+    max_age = get_settings().app_session_max_age_seconds
+    if max_age <= 0:
+        return
+
+    login_at = user.last_login_at
+    if login_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "app_session_expired",
+                "message": "App session expired",
+            },
+        )
+
+    if login_at.tzinfo is None:
+        login_at = login_at.replace(tzinfo=timezone.utc)
+
+    age = (datetime.now(timezone.utc) - login_at).total_seconds()
+    if age > max_age:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail={
+                "code": "app_session_expired",
+                "message": "App session expired",
+            },
+        )
 
 
 def require_back_office(user: User = Depends(current_user)) -> User:

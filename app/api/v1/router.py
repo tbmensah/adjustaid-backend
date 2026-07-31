@@ -11,12 +11,14 @@ from app.api.v1.endpoints import (
     me,
     metrics,
     ops_jobs,
+    session,
     tokens,
 )
 
 router = APIRouter()
 router.include_router(health.router, tags=["health"])
 router.include_router(me.router, tags=["auth"])
+router.include_router(session.router, tags=["auth"])
 router.include_router(metrics.router, tags=["metrics"])
 router.include_router(tokens.router, tags=["tokens"])
 router.include_router(jobs.router, tags=["jobs"])
