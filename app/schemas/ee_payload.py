@@ -38,7 +38,9 @@ class WindowItem(BaseModel):
 class DoorItem(BaseModel):
     model_config = _EE
     id: float | None = Field(default=None, alias="id")
-    category: Literal["interior", "exterior"] | None = Field(default=None, alias="category")
+    category: Literal["interior", "exterior", "cased-opening"] | None = Field(
+        default=None, alias="category"
+    )
     type: str | None = Field(default=None, alias="type")
     size: str | None = Field(default=None, alias="size")
     grade: str | None = Field(default=None, alias="grade")
