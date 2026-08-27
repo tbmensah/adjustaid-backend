@@ -161,3 +161,97 @@ def test_false_toggles_inside_enabled_section_kept() -> None:
     md = render_payload_markdown(payload)
     assert "serviceCall" in md
     assert "`false`" in md
+
+
+def test_xlsx_nested_room_lists_not_labeled_as_room() -> None:
+    """Windows/doors under Rooms must not get a nested 'Room N' Field head."""
+    payload = {
+        "projectDetails": {"insuredName": "A", "claimNumber": "1"},
+        "rooms": [
+            {
+                "id": 1,
+                "name": "Living",
+                "type": "room",
+                "doors": [{"id": 2, "category": "interior", "type": "6-panel"}],
+                "windows": [{"id": 3, "type": "single-hung", "material": "vinyl"}],
+            }
+        ],
+    }
+    rows = _user_friendly_rows(payload)
+    room_fields = [f for s, f, _v in rows if s == "Rooms"]
+    assert any(f.startswith("Room 1 — Living »") for f in room_fields)
+
+    window_type = next(
+        (f, v) for s, f, v in rows if s == "Rooms" and f.endswith("» Type") and v == "single-hung"
+    )
+    door_type = next(
+        (f, v) for s, f, v in rows if s == "Rooms" and f.endswith("» Type") and v == "6-panel"
+    )
+    assert "Windows" in window_type[0]
+    assert "Doors" in door_type[0]
+    # Nested list items must not be re-labeled as Room N (regression for Room-only head).
+    assert "» Room " not in window_type[0]
+    assert "» Room " not in door_type[0]
+    # List-row ids must not appear in Field paths or as ID value rows.
+    assert window_type[0] == "Room 1 — Living » Windows 1 » Type"
+    assert door_type[0] == "Room 1 — Living » Doors 1 » Type"
+    assert not any(f.endswith("» ID") or f == "ID" for f in room_fields)
+
+
+def test_xlsx_id_only_list_entries_use_entry_label_as_value() -> None:
+    """Id-only stubs show Layer 1 / Condenser Unit 1 — never the client id number."""
+    payload = {
+        "projectDetails": {"insuredName": "A", "claimNumber": "1"},
+        "exterior": {
+            "hvac": {
+                "condenserUnits": [{"id": 1785356713351}],
+                "miniSplits": [{"id": 1785356737941}],
+            }
+        },
+        "foundation": {
+            "hvac": {
+                "airHandlers": [
+                    {
+                        "id": 1785356747106,
+                        "aCoil": {"enabled": True, "detachAndReset": True},
+                    }
+                ]
+            }
+        },
+        "rooms": [
+            {
+                "id": 1785358035626,
+                "name": "Kitchen 1",
+                "type": "kitchen",
+                "flooring": {"layers": [{"id": 1785357088747}]},
+                "doors": [{"id": 1785451498257, "category": "interior", "nonCased": True}],
+            }
+        ],
+    }
+    rows = _user_friendly_rows(payload)
+    fields = [f for _s, f, _v in rows]
+    values = [v for _s, _f, v in rows]
+    joined = " | ".join(f"{f}={v}" for f, v in zip(fields, values))
+
+    assert not any(f.endswith("» ID") or f == "ID" for f in fields)
+    for n in (
+        "1785356713351",
+        "1785356737941",
+        "1785356747106",
+        "1785358035626",
+        "1785357088747",
+        "1785451498257",
+    ):
+        assert n not in joined
+
+    assert ("Exterior", "Hvac » Condenser Units 1", "Condenser Unit 1") in rows
+    assert ("Exterior", "Hvac » Mini Splits 1", "Mini Split 1") in rows
+    assert ("Rooms", "Room 1 — Kitchen 1 » Flooring » Layers 1", "Layer 1") in rows
+    assert ("Rooms", "Room 1 — Kitchen 1 » Doors 1 » Category", "interior") in rows
+    # Air handler has real nested fields — path has no id suffix.
+    assert any(
+        f == "Hvac » Air Handlers 1 » A Coil » Detach And Reset" and v == "Yes"
+        for s, f, v in rows
+        if s == "Foundation"
+    )
+    assert not any("1785356747106" in f for f in fields)

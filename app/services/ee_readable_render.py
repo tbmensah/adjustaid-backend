@@ -174,6 +174,10 @@ _ORDER_TRIM: tuple[str, ...] = (
     "shoe",
     "shoeFinish",
     "subtractCabinetry",
+    "vinylCoveEnabled",
+    "vinylCoveSize",
+    "tileBaseEnabled",
+    "tileBaseGrade",
 )
 
 _ORDER_WALL_COVERING: tuple[str, ...] = (
@@ -249,6 +253,7 @@ _ORDER_VANITY: tuple[str, ...] = (
     "enabled",
     "size",
     "grade",
+    "custom",
     "detachAndReset",
     "countertop",
     "backsplashUnattached",
@@ -273,6 +278,7 @@ _ORDER_KITCHEN_COUNTERTOP: tuple[str, ...] = (
     "size",
     "detachAndReset",
     "action",
+    "subdeckReplacement",
 )
 
 _ORDER_CABINETS: tuple[str, ...] = (
@@ -281,6 +287,7 @@ _ORDER_CABINETS: tuple[str, ...] = (
     "grade",
     "detachAndReset",
     "toeKick",
+    "fullHeight",
 )
 
 _ORDER_SHOWER: tuple[str, ...] = (
@@ -412,6 +419,37 @@ def _order_for(path: tuple[str, ...]) -> tuple[str, ...] | None:
 def _should_skip_branch(val: Any) -> bool:
     """Omit whole objects toggled off on the form (`enabled: false`)."""
     return isinstance(val, dict) and val.get("enabled") is False
+
+
+def _has_exportable_fields(val: dict[str, Any]) -> bool:
+    """True when a list/object row has anything besides a client list-row `id`."""
+    for k, v in val.items():
+        if k == "id":
+            continue
+        if _should_skip_branch(v):
+            continue
+        return True
+    return False
+
+
+def _singularize_words(words: str) -> str:
+    """Light plural→singular for list heads: Layers→Layer, Air Handlers→Air Handler."""
+    parts = words.split()
+    if not parts:
+        return words
+    last = parts[-1]
+    if last.endswith("ies") and len(last) > 3:
+        parts[-1] = last[:-3] + "y"
+    elif last.endswith("ses") or last.endswith("sses"):
+        parts[-1] = last[:-2]
+    elif last.endswith("s") and not last.endswith("ss") and len(last) > 1:
+        parts[-1] = last[:-1]
+    return " ".join(parts)
+
+
+def _list_entry_value(list_label: str, index: int) -> str:
+    """Human value for an id-only list stub, e.g. Layers + 1 → 'Layer 1'."""
+    return f"{_singularize_words(list_label)} {index}"
 
 
 def _indent(level: int) -> str:
@@ -584,6 +622,8 @@ def _walk_section(
             rows.append((section, _JOIN.join(label_parts) if label_parts else "(empty)", "—"))
             return
         for k in _ordered_keys(val, _order_for(path)):
+            if k == "id":
+                continue
             child = val[k]
             if _should_skip_branch(child):
                 continue
@@ -598,19 +638,32 @@ def _walk_section(
                 if _should_skip_branch(item):
                     continue
                 nm = item.get("name")
-                rid = item.get("id")
                 extra = ""
                 if isinstance(nm, str) and nm.strip():
                     extra = f" — {nm.strip()}"
-                elif rid is not None:
-                    extra = f" — {rid}"
-                if section == "Rooms":
+                # Only the top-level rooms array uses "Room N"; nested lists
+                # (windows, doors, layers, …) keep their own list-key label.
+                if section == "Rooms" and not label_parts:
                     head = f"Room {i + 1}{extra}"
+                    list_label = "Room"
                 elif label_parts:
-                    head = f"{label_parts[-1]} {i + 1}{extra}"
+                    list_label = label_parts[-1]
+                    head = f"{list_label} {i + 1}{extra}"
                 else:
+                    list_label = "Entry"
                     head = f"Entry {i + 1}{extra}"
                 base = label_parts[:-1] + [head] if label_parts else [head]
+                # Id-only stubs ({ "id": … }) mean the user added this list entry
+                # with no other fields — show "Layer 1" / "Condenser Unit 1", not the id.
+                if not _has_exportable_fields(item):
+                    rows.append(
+                        (
+                            section,
+                            _JOIN.join(base),
+                            _list_entry_value(list_label, i + 1),
+                        )
+                    )
+                    continue
                 _walk_section(section, item, base, rows, path)
             else:
                 ip = (label_parts + [f"Item {i + 1}"]) if label_parts else [f"Item {i + 1}"]
