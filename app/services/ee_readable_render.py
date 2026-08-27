@@ -174,6 +174,10 @@ _ORDER_TRIM: tuple[str, ...] = (
     "shoe",
     "shoeFinish",
     "subtractCabinetry",
+    "vinylCoveEnabled",
+    "vinylCoveSize",
+    "tileBaseEnabled",
+    "tileBaseGrade",
 )
 
 _ORDER_WALL_COVERING: tuple[str, ...] = (
@@ -249,6 +253,7 @@ _ORDER_VANITY: tuple[str, ...] = (
     "enabled",
     "size",
     "grade",
+    "custom",
     "detachAndReset",
     "countertop",
     "backsplashUnattached",
@@ -273,6 +278,7 @@ _ORDER_KITCHEN_COUNTERTOP: tuple[str, ...] = (
     "size",
     "detachAndReset",
     "action",
+    "subdeckReplacement",
 )
 
 _ORDER_CABINETS: tuple[str, ...] = (
@@ -281,6 +287,7 @@ _ORDER_CABINETS: tuple[str, ...] = (
     "grade",
     "detachAndReset",
     "toeKick",
+    "fullHeight",
 )
 
 _ORDER_SHOWER: tuple[str, ...] = (

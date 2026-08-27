@@ -117,6 +117,10 @@ class TrimOptions(BaseModel):
     shoe: bool | None = Field(default=None, alias="shoe")
     shoe_finish: str | None = Field(default=None, alias="shoeFinish")
     subtract_cabinetry: bool | None = Field(default=None, alias="subtractCabinetry")
+    vinyl_cove_enabled: bool | None = Field(default=None, alias="vinylCoveEnabled")
+    vinyl_cove_size: str | None = Field(default=None, alias="vinylCoveSize")
+    tile_base_enabled: bool | None = Field(default=None, alias="tileBaseEnabled")
+    tile_base_grade: str | None = Field(default=None, alias="tileBaseGrade")
 
 
 class WallCoveringOptions(BaseModel):
@@ -144,9 +148,20 @@ class ElectricalRoomOptions(BaseModel):
     gfi_outlets: float | None = Field(default=None, alias="gfiOutlets")
     light_switches: float | None = Field(default=None, alias="lightSwitches")
     ceiling_lights: float | None = Field(default=None, alias="ceilingLights")
-    ceiling_fans: float | None = Field(default=None, alias="ceilingFans")
+    ceiling_fans: str | None = Field(default=None, alias="ceilingFans")
     bathroom_light_bar: str | None = Field(default=None, alias="bathroomLightBar")
     bathroom_light_bar_qty: float | None = Field(default=None, alias="bathroomLightBarQty")
+
+    @field_validator("ceiling_fans", mode="before")
+    @classmethod
+    def _stringify_ceiling_fans(cls, v: object) -> object:
+        if isinstance(v, bool) or v is None:
+            return v
+        if isinstance(v, int):
+            return str(v)
+        if isinstance(v, float):
+            return str(int(v)) if v.is_integer() else str(v)
+        return v
 
 
 class VanityCountertop(BaseModel):
@@ -166,6 +181,7 @@ class VanityOptions(BaseModel):
     enabled: bool | None = Field(default=None, alias="enabled")
     size: str | None = Field(default=None, alias="size")
     grade: str | None = Field(default=None, alias="grade")
+    custom: bool | None = Field(default=None, alias="custom")
     detach_and_reset: bool | None = Field(default=None, alias="detachAndReset")
     countertop: VanityCountertop | None = Field(default=None, alias="countertop")
     backsplash_unattached: bool | None = Field(default=None, alias="backsplashUnattached")
@@ -224,6 +240,13 @@ class ToeKick(BaseModel):
     diagonal_installation: bool | None = Field(default=None, alias="diagonalInstallation")
 
 
+class CabinetFullHeight(BaseModel):
+    model_config = _EE
+    type: str | None = Field(default=None, alias="type")
+    grade: str | None = Field(default=None, alias="grade")
+    size: str | None = Field(default=None, alias="size")
+
+
 class CabinetOptions(BaseModel):
     model_config = _EE
     enabled: bool | None = Field(default=None, alias="enabled")
@@ -231,6 +254,7 @@ class CabinetOptions(BaseModel):
     grade: str | None = Field(default=None, alias="grade")
     detach_and_reset: bool | None = Field(default=None, alias="detachAndReset")
     toe_kick: ToeKick | None = Field(default=None, alias="toeKick")
+    full_height: CabinetFullHeight | None = Field(default=None, alias="fullHeight")
 
 
 class CountertopOptions(BaseModel):
@@ -241,6 +265,7 @@ class CountertopOptions(BaseModel):
     size: str | None = Field(default=None, alias="size")
     detach_and_reset: bool | None = Field(default=None, alias="detachAndReset")
     action: str | None = Field(default=None, alias="action")
+    subdeck_replacement: bool | None = Field(default=None, alias="subdeckReplacement")
 
 
 class PlumbingWaterSupplyLine(BaseModel):
@@ -350,6 +375,7 @@ class ApplianceFurnace(BaseModel):
     type: str | None = Field(default=None, alias="type")
     btu: str | None = Field(default=None, alias="btu")
     high_efficiency: bool | None = Field(default=None, alias="highEfficiency")
+    action: str | None = Field(default=None, alias="action")
 
 
 class ApplianceBoiler(BaseModel):
@@ -528,6 +554,7 @@ class ExteriorSheathing(BaseModel):
     model_config = _EE
     enabled: bool | None = Field(default=None, alias="enabled")
     type: str | None = Field(default=None, alias="type")
+    tongue_and_groove: bool | None = Field(default=None, alias="tongueAndGroove")
     replacement_height: str | None = Field(default=None, alias="replacementHeight")
 
 
@@ -742,6 +769,8 @@ class FoundationBoiler(BaseModel):
     circulator_pump: bool | None = Field(default=None, alias="circulatorPump")
     oil_tank_replacement: bool | None = Field(default=None, alias="oilTankReplacement")
     oil_replacement: bool | None = Field(default=None, alias="oilReplacement")
+    btu: str | None = Field(default=None, alias="btu")
+    mbh: str | None = Field(default=None, alias="mbh")
 
 
 class FoundationBaseboardHeat(BaseModel):
@@ -781,6 +810,8 @@ class Basement(BaseModel):
 class FoundationBreakerPanel(BaseModel):
     model_config = _EE
     enabled: bool | None = Field(default=None, alias="enabled")
+    amps: str | None = Field(default=None, alias="amps")
+    arc_faults: bool | None = Field(default=None, alias="arcFaults")
     panel_replacement: bool | None = Field(default=None, alias="panelReplacement")
     circuit_replacement: bool | None = Field(default=None, alias="circuitReplacement")
     panel_type: str | None = Field(default=None, alias="panelType")
